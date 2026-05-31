@@ -243,3 +243,81 @@ cat("Clinical + RPPA data:", nrow(clinical_rppa), "rows x", ncol(clinical_rppa),
 #   select(1:10) %>%
 #   head() %>%
 #   print()
+
+# Inspect mutation data ----------------------------------------------------
+
+# cat("Mutation data column names:\n")
+# cat(names(mutation_data), sep = "\n")
+
+# Prepare mutation features ------------------------------------------------
+
+# Commonly altered ccRCC genes selected from known kidney cancer biology.
+# from doi:10.1038/nature12222 and 10.1158/1078-0432.CCR-15-2631
+driver_genes <- c(
+   "VHL",   # Core ccRCC tumour suppressor; VHL loss drives HIF/hypoxia and angiogenesis biology
+   "PBRM1", # Chromatin-remodelling tumour suppressor frequently mutated in ccRCC
+   "BAP1",  # Tumour suppressor associated with more aggressive ccRCC and poorer prognosis
+   "SETD2", # Chromatin/histone methyltransferase gene altered in ccRCC and linked to genomic regulation
+   "KDM5C", # Chromatin-regulation gene recurrently altered in ccRCC
+   "MTOR",  # Kinase pathway gene; links directly to PI3K/AKT/mTOR signalling and RCC targeted therapy
+   "PTEN",  # Negative regulator of PI3K/AKT signalling; recurrently altered in TCGA ccRCC
+   "TSC1",  # mTOR pathway regulator; TSC1/TSC2/MTOR mutations are linked to rapalog response in metastatic RCC
+   "TSC2"   # mTOR pathway regulator that functions with TSC1 to suppress mTORC1 signalling
+)
+
+# Convert the long mutation table into sample-level binary mutation features.
+
+# Keep only sample ID and gene symbol, then restrict to selected genes.
+mutation_long <- mutation_data %>%
+   dplyr::transmute(
+      sample_id = .data$Tumor_Sample_Barcode,
+      gene_symbol = .data$Hugo_Symbol
+   ) %>%
+   dplyr::filter(.data$gene_symbol %in% driver_genes) %>%
+   dplyr::distinct(.data$sample_id, .data$gene_symbol)
+
+# Create a sample-by-gene mutation matrix.
+# table() counts whether each selected gene appears in each sample.
+mutation_matrix <- table(
+   mutation_long$sample_id,
+   mutation_long$gene_symbol
+)
+   
+
+# Convert the matrix to a data frame and make values binary:
+# 1 = mutated, 0 = not mutated.
+mutation_features <- as.data.frame.matrix(mutation_matrix) %>%
+   tibble::rownames_to_column("sample_id") %>%
+   dplyr::mutate(
+      dplyr::across(
+         -sample_id,
+         ~ as.integer(.x > 0)
+      )
+   ) %>%
+   dplyr::rename_with(
+      ~ paste0("mut_", .x),
+      -sample_id
+   )
+
+# Add any selected driver genes that were not observed in the mutation data.
+# This keeps the feature table consistent even if a gene has zero mutations.
+missing_mutation_cols <- paste0("mut_", driver_genes)[
+   !paste0("mut_", driver_genes) %in% names(mutation_features)
+]
+
+for (col in missing_mutation_cols) {
+   mutation_features[[col]] <- 0
+}
+
+# Keep sample_id first, then mutation columns in the same order as driver_genes.
+mutation_features <- mutation_features %>%
+   dplyr::select(
+      sample_id,
+      dplyr::all_of(paste0("mut_", driver_genes))
+   )
+
+cat("Mutation feature data:", nrow(mutation_features), "rows x", ncol(mutation_features), "columns\n")
+
+mutation_features %>%
+   dplyr::summarise(dplyr::across(dplyr::starts_with("mut_"), sum)) %>%
+   print()
