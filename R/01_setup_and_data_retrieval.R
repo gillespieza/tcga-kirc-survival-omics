@@ -153,7 +153,18 @@ surv_obj <- Surv(
 km_fit <- survfit(surv_obj ~ 1)
 
 # Print a compact summary of the Kaplan-Meier fit
-print(km_fit)
+# print(km_fit)
+km_median <- as.numeric(km_fit$table[["median"]])
+
+cat(
+   "Overall survival:",
+   km_fit$n,
+   "patients,",
+   km_fit$events,
+   "events, median survival",
+   if_else(is.na(km_median), "not reached", as.character(round(km_median, 1))),
+   "months\n"
+)
 
 # Plot the overall survival curve
 suppressMessages(
@@ -170,3 +181,65 @@ suppressMessages(
       print(km_plot)
    })
 )
+
+
+# Inspect RPPA protein feature names --------------------------------------
+
+# RPPA files usually have one row per antibody/protein feature and one column
+# per tumour sample. The first column identifies the protein feature.
+# rppa_data %>%
+#   dplyr::select(1:6) %>%
+#   head(10) %>%
+#   print()
+
+
+# Prepare RPPA proteomics table -------------------------------------------
+
+# Convert RPPA from wide feature-by-sample into sample-by-feature
+# This gives one row/tumour sample and one column/protein feature
+rppa_proteomics <- rppa_data %>%
+   pivot_longer(
+      cols = -Composite.Element.REF,
+      names_to = "sample_id",
+      values_to = "rppa_zscore"
+   ) %>%
+   separate(
+      Composite.Element.REF,
+      into = c("gene_symbol", "protein_feature"),
+      sep = "\\|",
+      remove = FALSE,
+      extra = "merge",
+      fill = "right"
+   ) %>%
+   mutate(
+      # Make protein feature names safe to use as column names later
+      protein_feature_clean = Composite.Element.REF %>%
+         str_replace_all("[^A-Za-z0-9]+", "_") %>%
+         str_replace_all("_$", "")
+   ) %>%
+   select(sample_id, protein_feature_clean, rppa_zscore) %>%
+   pivot_wider(
+      names_from = protein_feature_clean,
+      values_from = rppa_zscore
+   )
+
+# Inspect model-ready RPPA table
+cat("Model-ready RPPA data:", nrow(rppa_proteomics), "rows x", ncol(rppa_proteomics), "columns\n")
+
+# rppa_proteomics %>%
+#   select(1:6) %>%
+#   head() %>%
+#   print()
+
+# Integrate clinical and RPPA proteomics data -----------------------------
+
+# inner_join will keep only rows with both data
+clinical_rppa <- clinical_survival %>%
+   inner_join(rppa_proteomics, by = "sample_id")
+
+cat("Clinical + RPPA data:", nrow(clinical_rppa), "rows x", ncol(clinical_rppa), "columns\n")
+
+# clinical_rppa %>%
+#   select(1:10) %>%
+#   head() %>%
+#   print()
