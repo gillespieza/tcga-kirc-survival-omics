@@ -9,6 +9,7 @@ cran_packages <- c(
   "tidyverse",   # Loads dplyr, tidyr, readr, ggplot2, stringr, and related tools
   "ggpubr",      # Provides plotting helpers used by survminer
   "car",         # Provides statistical helpers required by ggpubr
+  "markdown",    # Supports markdown rendering used by plotting/report helpers
   "survival",    # Fits survival models
   "survminer",   # Creates Kaplan-Meier and survival plots
   "glmnet"       # Fits penalised models, including LASSO Cox regression
@@ -96,4 +97,94 @@ sample_lists <- sampleLists(cbio, studyId = study_id)
 # Uncomment to inspect the sample lists
 # sample_lists %>%
 #   select(sampleListId, name, category) %>%
-#   print(n = Inf)
+  # print(n = Inf)
+
+
+# Retrieve clinical data ---------------------------------------------------
+
+clinical_data <- clinicalData(cbio, studyId = study_id)
+
+# Uncomment to find all the column names
+# Print all clinical column names, one per line
+# cat(names(clinical_data), sep = "\n")
+
+
+# Prepare clinical survival table -----------------------------------------
+
+clinical_survival <- clinical_data %>%
+   select(
+      patientId,
+      sampleId,
+      OS_MONTHS,
+      OS_STATUS,
+      AGE,
+      SEX,
+      AJCC_PATHOLOGIC_TUMOR_STAGE,
+      GRADE
+   ) %>%
+   mutate(
+      # Convert overall survival time from text to numeric months
+      os_months = as.numeric(OS_MONTHS),
+      
+      # Convert overall survival status into a Cox model event indicator:
+      # 1 = death event, 0 = censored/alive
+      os_event = if_else(str_detect(OS_STATUS, "DECEASED"), 1, 0),
+      
+      # Convert age from text to numeric years
+      age = as.numeric(AGE),
+      
+      # Convert clinical categories into factors for modelling
+      sex = as.factor(SEX),
+      stage = as.factor(AJCC_PATHOLOGIC_TUMOR_STAGE),
+      grade = as.factor(GRADE)
+   ) %>%
+   select(
+      patientId,
+      sampleId,
+      os_months,
+      os_event,
+      age,
+      sex,
+      stage,
+      grade
+   ) %>%
+   # Keep only patients with usable overall survival time and status
+   filter(!is.na(os_months), !is.na(os_event))
+
+# Summarise available survival data
+clinical_survival %>%
+   summarise(
+      patients = n_distinct(patientId),
+      samples = n_distinct(sampleId),
+      events = sum(os_event),
+      median_follow_up_months = median(os_months, na.rm = TRUE)
+   ) %>%
+   print()
+
+
+# Quick overall survival check --------------------------------------------
+
+# Create a survival object from the raw clinical columns.
+# time = follow-up or survival time in months
+# event = TRUE if the patient died, FALSE if the patient was censored/alive
+surv_obj <- Surv(
+   time = as.numeric(clinical_data$OS_MONTHS),
+   event = clinical_data$OS_STATUS == "1:DECEASED"
+)
+
+# Fit a Kaplan-Meier curve for all patients together
+km_fit <- survfit(surv_obj ~ 1)
+
+# Print a short summary of the Kaplan-Meier fit
+summary(km_fit)
+
+# Plot the overall survival curve
+km_plot <- ggsurvplot(
+   km_fit,
+   data = clinical_data,
+   risk.table = TRUE,
+   xlab = "Time (months)",
+   ylab = "Overall survival probability"
+)
+
+print(km_plot)
