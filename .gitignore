@@ -48,3 +48,8 @@ po/*~
 # RStudio Connect folder
 rsconnect/
 *.tar.gz
+
+# Specific data files 
+data/*.tar.gz
+data/raw/*.tar.gz
+data/**/data_methylation*.txt

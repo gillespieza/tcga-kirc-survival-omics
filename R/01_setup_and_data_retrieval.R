@@ -158,8 +158,8 @@ clinical_survival %>%
       samples = n_distinct(sampleId),
       events = sum(os_event),
       median_follow_up_months = median(os_months, na.rm = TRUE)
-   ) %>%
-   print()
+   ) # %>%
+   #print()
 
 
 # Quick overall survival check --------------------------------------------
