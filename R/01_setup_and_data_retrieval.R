@@ -321,3 +321,49 @@ cat("Mutation feature data:", nrow(mutation_features), "rows x", ncol(mutation_f
 mutation_features %>%
    dplyr::summarise(dplyr::across(dplyr::starts_with("mut_"), sum)) %>%
    print()
+
+# Integrate clinical, RPPA, and mutation data -----------------------------
+
+# At this point we have:
+# clinical_rppa:
+#   One row per tumour sample with survival variables, clinical covariates,
+#   and RPPA protein Z-score features.
+#
+# mutation_features:
+#   One row per tumour sample with at least one mutation in the selected
+#   driver/pathway genes. Each mutation column is binary:
+#   1 = mutation recorded in that gene
+#   0 = mutation not recorded in that gene
+
+clinical_rppa_mutation <- clinical_rppa %>%
+   # Add mutation features to the clinical + RPPA table using sample IDs
+   # use a left_join here so we don't lose rows with missing mutations
+   left_join(mutation_features, by = "sample_id") %>%
+   
+   # Replace missing mutation values with 0.
+   # These missing values occur when a sample had no mutation in the selected
+   # driver/pathway genes and therefore was absent from mutation_features.
+   mutate(
+      across(
+         starts_with("mut_"),
+         ~ replace_na(.x, 0)
+      )
+   )
+
+# Print the size of the integrated dataset.
+# The number of rows should stay the same as clinical_rppa if the left join
+# worked correctly.
+cat(
+   "Clinical + RPPA + mutation data:",
+   nrow(clinical_rppa_mutation),
+   "rows x",
+   ncol(clinical_rppa_mutation),
+   "columns\n"
+)
+
+# Check mutation counts after integration.
+# These counts should match the earlier mutation summary, but now the table also
+# includes samples with no selected driver/pathway mutation.
+clinical_rppa_mutation %>%
+   summarise(across(starts_with("mut_"), sum)) %>%
+   print()
