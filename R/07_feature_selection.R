@@ -1,4 +1,4 @@
-﻿# RPPA feature selection -------------------------------------------------------
+# RPPA feature selection -------------------------------------------------------
 #
 # Screens RPPA protein expression features with univariable Cox models and keeps
 # a compact, interpretable set of proteins for downstream survival modelling.

@@ -1,4 +1,4 @@
-﻿# Report-ready results and figures -------------------------------------------
+# Report-ready results and figures -------------------------------------------
 #
 # Creates final compact outputs for the assignment report from objects generated
 # by the survival-analysis workflow.

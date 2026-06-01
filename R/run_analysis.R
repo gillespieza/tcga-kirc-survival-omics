@@ -1,4 +1,4 @@
-﻿# Run full analysis workflow ---------------------------------------------------
+# Run full analysis workflow ---------------------------------------------------
 #
 # Orchestrates the complete TCGA KIRC survival analysis pipeline by sourcing
 # each numbered script in sequence. Each step is timed and wrapped in error

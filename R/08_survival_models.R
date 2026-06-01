@@ -1,4 +1,4 @@
-﻿# Survival model comparison ---------------------------------------------------
+# Survival model comparison ---------------------------------------------------
 #
 # Fits and compares clinical-only, mutation-only, RPPA-only, integrated Cox, and
 # optional penalised Cox models for TCGA KIRC overall survival. The goal is a
