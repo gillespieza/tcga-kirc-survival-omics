@@ -80,19 +80,21 @@ fit_univariable_rppa <- function(feature_name) {
    
    if (is.null(fit)) return(NULL)
    
-   fit_summary <- summary(fit)
-   coef_row <- as.data.frame(fit_summary$coefficients)[1, , drop = FALSE]
-   
-   tibble::tibble(
-      feature      = feature_name,
-      n            = nrow(model_data),
-      events       = sum(model_data$os_event),
-      coef         = coef_row$coef,
-      hazard_ratio = exp(coef_row$coef),
-      conf_low     = exp(coef_row$coef - 1.96 * coef_row$`se(coef)`),
-      conf_high    = exp(coef_row$coef + 1.96 * coef_row$`se(coef)`),
-      p_value      = coef_row$`Pr(>|z|)`
-   )
+   broom::tidy(
+      fit,
+      conf.int    = TRUE,
+      exponentiate = TRUE
+   ) %>%
+      dplyr::slice(1) %>%
+      dplyr::transmute(
+         feature      = feature_name,
+         n            = nrow(model_data),
+         events       = sum(model_data$os_event),
+         hazard_ratio = .data$estimate,
+         conf_low     = .data$conf.low,
+         conf_high    = .data$conf.high,
+         p_value      = .data$p.value
+      )
 }
 
 rppa_univariable_results <- purrr::map_dfr(rppa_feature_cols, fit_univariable_rppa) %>%

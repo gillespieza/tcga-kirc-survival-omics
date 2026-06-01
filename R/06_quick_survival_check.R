@@ -51,8 +51,11 @@ survival_data <- clinical_rppa_mutation %>%
    dplyr::mutate(
       os_event = as.integer(.data$os_event),
       sex      = droplevels(factor(.data$sex)),
-      stage    = droplevels(.data$stage),
-      grade    = droplevels(.data$grade)
+      # Treat ordered clinical categories as reference-coded factors in Cox
+      # models. This gives interpretable contrasts such as STAGE IV vs STAGE I
+      # instead of polynomial terms like stage.L and stage.Q.
+      stage    = stats::relevel(droplevels(factor(.data$stage, ordered = FALSE)), ref = "STAGE I"),
+      grade    = stats::relevel(droplevels(factor(.data$grade, ordered = FALSE)), ref = "G1")
    )
 
 if (nrow(survival_data) == 0) {
@@ -113,16 +116,17 @@ clinical_cox_fit <- survival::coxph(
    ties = "efron"
 )
 
-clinical_cox_summary <- summary(clinical_cox_fit)
-clinical_cox_results <- as.data.frame(clinical_cox_summary$coefficients) %>%
-   tibble::rownames_to_column("term") %>%
-   dplyr::as_tibble() %>%
+clinical_cox_results <- broom::tidy(
+   clinical_cox_fit,
+   conf.int    = TRUE,
+   exponentiate = TRUE
+) %>%
    dplyr::transmute(
       term,
-      hazard_ratio = exp(.data$coef),
-      conf_low     = exp(.data$coef - 1.96 * .data$`se(coef)`),
-      conf_high    = exp(.data$coef + 1.96 * .data$`se(coef)`),
-      p_value      = .data$`Pr(>|z|)`
+      hazard_ratio = .data$estimate,
+      conf_low     = .data$conf.low,
+      conf_high    = .data$conf.high,
+      p_value      = .data$p.value
    ) %>%
    dplyr::arrange(.data$p_value)
 

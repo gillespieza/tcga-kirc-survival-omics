@@ -13,6 +13,7 @@
 #   survival  - Core survival-analysis models (Surv, coxph, etc.)
 #   survminer - Kaplan-Meier plots and survival-curve visualisation
 #   glmnet    - Penalised regression, including LASSO Cox models
+#   broom     - Tidy model summaries for Cox model results
 #
 # Global constants defined:
 #   study_id              - cBioPortal study identifier
@@ -49,7 +50,8 @@ cran_packages <- c(
    "markdown",  # Markdown rendering (dependency of plotting/report helpers)
    "survival",  # Core survival-analysis models
    "survminer", # Kaplan-Meier plots and survival-curve visualisation
-   "glmnet"     # Penalised regression, including LASSO Cox models
+   "glmnet",    # Penalised regression, including LASSO Cox models
+   "broom"      # Tidy model summaries for Cox model results
 )
 
 for (pkg in cran_packages) {
@@ -65,6 +67,7 @@ library(markdown)
 library(survival)
 library(survminer)
 library(glmnet)
+library(broom)
 
 message("Packages loaded successfully.")
 

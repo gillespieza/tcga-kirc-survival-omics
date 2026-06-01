@@ -87,16 +87,17 @@ fit_cox_model <- function(feature_cols, model_name) {
 }
 
 extract_cox_results <- function(fit) {
-   fit_summary <- summary(fit)
-   as.data.frame(fit_summary$coefficients) %>%
-      tibble::rownames_to_column("term") %>%
-      dplyr::as_tibble() %>%
+   broom::tidy(
+      fit,
+      conf.int    = TRUE,
+      exponentiate = TRUE
+   ) %>%
       dplyr::transmute(
          term,
-         hazard_ratio = exp(.data$coef),
-         conf_low     = exp(.data$coef - 1.96 * .data$`se(coef)`),
-         conf_high    = exp(.data$coef + 1.96 * .data$`se(coef)`),
-         p_value      = .data$`Pr(>|z|)`
+         hazard_ratio = .data$estimate,
+         conf_low     = .data$conf.low,
+         conf_high    = .data$conf.high,
+         p_value      = .data$p.value
       ) %>%
       dplyr::arrange(.data$p_value)
 }
