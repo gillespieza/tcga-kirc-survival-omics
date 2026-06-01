@@ -1,24 +1,31 @@
-# Quick survival checks --------------------------------------------------------
+# Quick survival checks -------------------------------------------------------
 #
 # Creates the first report-ready survival outputs from the integrated TCGA KIRC
-# dataset: cohort summary, overall Kaplan-Meier curve, and a clinical baseline
-# Cox model using age, sex, pathological stage, and grade.
+# dataset: cohort summary, overall and stage-stratified Kaplan-Meier curves,
+# a clinical baseline Cox model using age, sex, pathological stage, and grade,
+# and a proportional hazards assumption check.
 #
 # Requires: 05_integrate_data.R to have been sourced so that
-#   clinical_rppa_mutation is available.
+#   clinical_rppa_mutation is available. broom must be installed (it is
+#   installed alongside tidyverse but not attached by library(tidyverse)).
 #
 # Produces:
-#   survival_data            - Integrated table with complete survival data
+#   survival_data            - Integrated table with complete survival data,
+#                              stage and grade re-levelled for Cox modelling
 #   overall_surv_obj         - Surv object for overall survival
 #   overall_km_fit           - Kaplan-Meier fit for all samples
+#   stage_km_fit             - Kaplan-Meier fit stratified by AJCC stage
 #   overall_survival_summary - One-row cohort survival summary
 #   clinical_cox_fit         - Cox model using clinical covariates
 #   clinical_cox_results     - Tidy hazard-ratio table for clinical model
+#   cox_zph                  - Schoenfeld residual test for proportional
+#                              hazards assumption
 #
 # Outputs:
 #   results/overall_survival_summary.csv
 #   results/clinical_cox_results.csv
 #   figures/overall_kaplan_meier.png
+#   figures/stage_kaplan_meier.png
 
 
 # Validate inputs -------------------------------------------------------------
@@ -44,7 +51,7 @@ if (!dir.exists("results")) dir.create("results", recursive = TRUE)
 if (!dir.exists("figures")) dir.create("figures", recursive = TRUE)
 
 
-# Prepare survival analysis table --------------------------------------------
+# Prepare survival analysis table ---------------------------------------------
 
 survival_data <- clinical_rppa_mutation %>%
    dplyr::filter(!is.na(.data$os_months), !is.na(.data$os_event)) %>%
@@ -75,21 +82,23 @@ overall_surv_obj <- survival::Surv(
 )
 
 overall_km_fit <- survival::survfit(overall_surv_obj ~ 1, data = survival_data)
-km_table <- overall_km_fit$table
 
-median_survival_months <- unname(as.numeric(km_table[["median"]]))
-if (length(median_survival_months) == 0 || is.nan(median_survival_months)) {
-   median_survival_months <- NA_real_
-}
+# Extract median survival using quantile() rather than indexing $table
+# directly, which can silently return NaN when the KM curve does not cross 0.5
+# (i.e. fewer than half of patients have experienced the event).
+median_survival_months <- tryCatch(
+   unname(quantile(overall_km_fit, probs = 0.5)$quantile),
+   error = function(e) NA_real_
+)
 
 overall_survival_summary <- survival_data %>%
    dplyr::summarise(
-      samples                = dplyr::n(),
-      patients               = dplyr::n_distinct(.data$patient_id),
-      events                 = sum(.data$os_event),
-      censored               = dplyr::n() - sum(.data$os_event),
+      samples                 = dplyr::n(),
+      patients                = dplyr::n_distinct(.data$patient_id),
+      events                  = sum(.data$os_event),
+      censored                = dplyr::n() - sum(.data$os_event),
       median_follow_up_months = median(.data$os_months, na.rm = TRUE),
-      median_survival_months = median_survival_months
+      median_survival_months  = median_survival_months
    )
 
 readr::write_csv(overall_survival_summary, "results/overall_survival_summary.csv")
@@ -106,6 +115,10 @@ clinical_model_data <- survival_data %>%
    dplyr::select(os_months, os_event, age, sex, stage, grade) %>%
    tidyr::drop_na()
 
+n_dropped_cc <- nrow(survival_data) - nrow(clinical_model_data)
+if (n_dropped_cc > 0) {
+   message(n_dropped_cc, " row(s) dropped for complete case Cox analysis.")
+}
 if (nrow(clinical_model_data) < 20) {
    warning("Clinical Cox model has fewer than 20 complete cases.")
 }
@@ -116,9 +129,13 @@ clinical_cox_fit <- survival::coxph(
    ties = "efron"
 )
 
+# C-index measures model discrimination (0.5 = random, 1.0 = perfect).
+c_index <- summary(clinical_cox_fit)$concordance[["C"]]
+message("Clinical Cox C-index: ", round(c_index, 3))
+
 clinical_cox_results <- broom::tidy(
    clinical_cox_fit,
-   conf.int    = TRUE,
+   conf.int     = TRUE,
    exponentiate = TRUE
 ) %>%
    dplyr::transmute(
@@ -137,20 +154,66 @@ message("Clinical Cox results:")
 print(clinical_cox_results)
 
 
-# Save Kaplan-Meier plot ------------------------------------------------------
+# Proportional hazards assumption test ----------------------------------------
+# Schoenfeld residuals test. A significant p-value for a covariate indicates
+# its hazard ratio changes over time, violating the PH assumption. A
+# significant global p-value suggests the model as a whole should be revisited
+# — for example by adding time-varying coefficients or stratifying on the
+# offending covariate.
 
-km_plot <- survminer::ggsurvplot(
+cox_zph <- survival::cox.zph(clinical_cox_fit)
+message("Proportional hazards test (Schoenfeld residuals):")
+print(cox_zph)
+
+if (any(cox_zph$table[, "p"] < 0.05)) {
+   warning(
+      "One or more covariates show evidence of non-proportional hazards. ",
+      "Consider time-varying coefficients or a stratified Cox model."
+   )
+}
+
+
+# Kaplan-Meier plots ----------------------------------------------------------
+
+# Overall KM curve
+overall_km_plot <- survminer::ggsurvplot(
    overall_km_fit,
-   data = survival_data,
-   risk.table = TRUE,
-   legend = "none",
-   xlab = "Time (months)",
-   ylab = "Overall survival probability",
-   title = "TCGA KIRC overall survival"
+   data         = survival_data,
+   risk.table   = TRUE,
+   legend       = "none",
+   xlab         = "Time (months)",
+   ylab         = "Overall survival probability",
+   title        = "TCGA KIRC: overall survival"
 )
 
 png("figures/overall_kaplan_meier.png", width = 1800, height = 1600, res = 220)
-print(km_plot)
+print(overall_km_plot)
 dev.off()
 
-message("Saved overall Kaplan-Meier plot to figures/overall_kaplan_meier.png")
+message("Saved overall KM plot to figures/overall_kaplan_meier.png")
+
+# Stage-stratified KM curve
+# Log-rank test p-value and method label are included to indicate whether
+# stage groups differ significantly in survival.
+stage_km_fit <- survival::survfit(
+   overall_surv_obj ~ stage,
+   data = survival_data
+)
+
+stage_km_plot <- survminer::ggsurvplot(
+   stage_km_fit,
+   data          = survival_data,
+   risk.table    = TRUE,
+   pval          = TRUE,
+   pval.method   = TRUE,
+   legend.title  = "Stage",
+   xlab          = "Time (months)",
+   ylab          = "Overall survival probability",
+   title         = "TCGA KIRC: overall survival by AJCC stage"
+)
+
+png("figures/stage_kaplan_meier.png", width = 1800, height = 1800, res = 220)
+print(stage_km_plot)
+dev.off()
+
+message("Saved stage-stratified KM plot to figures/stage_kaplan_meier.png")
