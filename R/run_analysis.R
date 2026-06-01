@@ -12,7 +12,8 @@
 #   03_prepare_rppa.R      - Reshape and clean RPPA data
 #   04_prepare_mutations.R - Build binary mutation feature table
 #   05_integrate_data.R    - Integrate all data layers
-#    06_quick_survival_check.R
+#   06_quick_survival_check.R
+#   07_feature_selection.R
 #
 # Usage:
 #   source("run_analysis.R")
@@ -72,6 +73,7 @@ source_step("R/03_prepare_rppa.R",         "Prepare RPPA proteomics data")
 source_step("R/04_prepare_mutations.R",    "Prepare binary mutation features")
 source_step("R/05_integrate_data.R",       "Integrate all data layers")
 source_step("R/06_quick_survival_check.R", "Quick survival check")
+source_step("R/07_feature_selection.R",    "Screen RPPA for features")
 
 total_elapsed <- round((proc.time() - t_pipeline_start)[["elapsed"]], 1)
 
