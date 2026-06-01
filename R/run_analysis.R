@@ -1,4 +1,4 @@
-# Run full analysis workflow ---------------------------------------------------
+﻿# Run full analysis workflow ---------------------------------------------------
 #
 # Orchestrates the complete TCGA KIRC survival analysis pipeline by sourcing
 # each numbered script in sequence. Each step is timed and wrapped in error
@@ -12,8 +12,10 @@
 #   03_prepare_rppa.R      - Reshape and clean RPPA data
 #   04_prepare_mutations.R - Build binary mutation feature table
 #   05_integrate_data.R    - Integrate all data layers
-#   06_quick_survival_check.R
-#   07_feature_selection.R
+#   06_quick_survival_check.R - Overall KM and clinical Cox checks
+#   07_feature_selection.R - RPPA univariable Cox feature selection
+#   08_survival_models.R   - Clinical/omics/integrated model comparison
+#   09_results_figures.R   - Save report-ready figures and tables
 #
 # Usage:
 #   source("run_analysis.R")
@@ -74,9 +76,12 @@ source_step("R/04_prepare_mutations.R",    "Prepare binary mutation features")
 source_step("R/05_integrate_data.R",       "Integrate all data layers")
 source_step("R/06_quick_survival_check.R", "Quick survival check")
 source_step("R/07_feature_selection.R",    "Screen RPPA for features")
+source_step("R/08_survival_models.R",      "Compare survival models")
+source_step("R/09_results_figures.R",      "Create report-ready outputs")
 
 total_elapsed <- round((proc.time() - t_pipeline_start)[["elapsed"]], 1)
 
 message("\n", strrep("=", 60))
 message("Pipeline complete. Total time: ", total_elapsed, "s.")
 message(strrep("=", 60))
+
