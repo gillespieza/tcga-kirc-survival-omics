@@ -12,6 +12,7 @@
 #   03_prepare_rppa.R      - Reshape and clean RPPA data
 #   04_prepare_mutations.R - Build binary mutation feature table
 #   05_integrate_data.R    - Integrate all data layers
+#    06_quick_survival_check.R
 #
 # Usage:
 #   source("run_analysis.R")
@@ -64,12 +65,13 @@ source_step <- function(path, step_name) {
 
 t_pipeline_start <- proc.time()
 
-source_step("R/00_setup.R",              "Package setup and configuration")
-source_step("R/01_load_data.R",          "Load raw cBioPortal data")
-source_step("R/02_prepare_clinical.R",   "Prepare clinical survival table")
-source_step("R/03_prepare_rppa.R",       "Prepare RPPA proteomics data")
-source_step("R/04_prepare_mutations.R",  "Prepare binary mutation features")
-source_step("R/05_integrate_data.R",     "Integrate all data layers")
+source_step("R/00_setup.R",                "Package setup and configuration")
+source_step("R/01_load_data.R",            "Load raw cBioPortal data")
+source_step("R/02_prepare_clinical.R",     "Prepare clinical survival table")
+source_step("R/03_prepare_rppa.R",         "Prepare RPPA proteomics data")
+source_step("R/04_prepare_mutations.R",    "Prepare binary mutation features")
+source_step("R/05_integrate_data.R",       "Integrate all data layers")
+source_step("R/06_quick_survival_check.R", "Quick survival check")
 
 total_elapsed <- round((proc.time() - t_pipeline_start)[["elapsed"]], 1)
 
