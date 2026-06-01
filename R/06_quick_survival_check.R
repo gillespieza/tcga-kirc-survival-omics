@@ -207,6 +207,7 @@ stage_km_plot <- survminer::ggsurvplot(
    pval          = TRUE,
    pval.method   = TRUE,
    legend.title  = "Stage",
+   legend.labs   = levels(survival_data$stage), # remove the "stage=" from legend
    xlab          = "Time (months)",
    ylab          = "Overall survival probability",
    title         = "TCGA KIRC: overall survival by AJCC stage"
