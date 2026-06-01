@@ -58,7 +58,7 @@ cox_formula_from_terms <- function(feature_cols) {
    )
 }
 
-fit_cox_model <- function(model_name, feature_cols) {
+fit_cox_model <- function(feature_cols, model_name) {
    model_data <- build_model_data(feature_cols)
    
    if (nrow(model_data) < 30 || sum(model_data$os_event) < 5) {
