@@ -68,7 +68,7 @@ ggplot2::ggsave(
 # Top RPPA feature figure -----------------------------------------------------
 
 top_rppa_plot_data <- rppa_univariable_results %>%
-   dplyr::slice_head(n = min(10L, dplyr::n())) %>%
+   dplyr::slice_head(n = min(10L, nrow(rppa_univariable_results))) %>%
    dplyr::mutate(
       feature = factor(.data$feature, levels = rev(.data$feature)),
       neg_log10_p = -log10(.data$p_value)

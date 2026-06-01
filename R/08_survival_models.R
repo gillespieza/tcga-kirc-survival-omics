@@ -179,7 +179,7 @@ if (nrow(lasso_data) >= 50 && sum(lasso_data$os_event) >= 20) {
       dplyr::arrange(dplyr::desc(abs(.data$coefficient)))
    
    lasso_lp <- as.numeric(stats::predict(lasso_cv_fit, newx = x_lasso, s = "lambda.1se", type = "link"))
-   lasso_concordance <- survival::concordance(y_lasso ~ lasso_lp)
+   lasso_concordance <- survival::concordance(y_lasso ~ I(-lasso_lp))
    
    model_comparison_results <- model_comparison_results %>%
       dplyr::bind_rows(

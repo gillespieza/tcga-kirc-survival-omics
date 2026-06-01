@@ -1,0 +1,8 @@
+item,value
+analysis_samples,455
+analysis_events,159
+top_rppa_feature,CDKN1A_p21
+top_rppa_hazard_ratio,1.595
+top_rppa_p_value,1.39e-10
+best_model,integrated
+best_model_c_index,0.815
