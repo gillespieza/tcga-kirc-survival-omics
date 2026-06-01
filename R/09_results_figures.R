@@ -32,10 +32,13 @@ if (!dir.exists("figures")) dir.create("figures", recursive = TRUE)
 
 
 # Model comparison figure -----------------------------------------------------
+# model_comparison_results is sorted descending by c_index; factor levels are
+# set in the same order so that after coord_flip() the best model appears at
+# the top of the chart.
 
 model_c_index_plot <- model_comparison_results %>%
    dplyr::mutate(
-      model = factor(.data$model, levels = rev(.data$model))
+      model = factor(.data$model, levels = .data$model)
    ) %>%
    ggplot2::ggplot(ggplot2::aes(x = model, y = c_index)) +
    ggplot2::geom_col(fill = "#2C7FB8", width = 0.7) +
@@ -44,59 +47,64 @@ model_c_index_plot <- model_comparison_results %>%
          ymin = pmax(0, c_index - 1.96 * c_index_se),
          ymax = pmin(1, c_index + 1.96 * c_index_se)
       ),
-      width = 0.2,
+      width  = 0.2,
       colour = "grey30"
    ) +
    ggplot2::coord_flip() +
    ggplot2::scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.1)) +
    ggplot2::labs(
-      x = NULL,
-      y = "Concordance index",
+      x     = NULL,
+      y     = "Concordance index",
       title = "Survival model comparison"
    ) +
    ggplot2::theme_minimal(base_size = 12)
 
 ggplot2::ggsave(
    filename = "figures/model_c_index_comparison.png",
-   plot = model_c_index_plot,
-   width = 7,
-   height = 4.5,
-   dpi = 300
+   plot     = model_c_index_plot,
+   width    = 7,
+   height   = 4.5,
+   dpi      = 300
 )
 
 
 # Top RPPA feature figure -----------------------------------------------------
+# Plot BH-adjusted p-values on the y-axis to be consistent with the FDR-gated
+# feature selection applied upstream in 07_feature_selection.R.
 
 top_rppa_plot_data <- rppa_univariable_results %>%
    dplyr::slice_head(n = min(10L, nrow(rppa_univariable_results))) %>%
    dplyr::mutate(
-      feature = factor(.data$feature, levels = rev(.data$feature)),
-      neg_log10_p = -log10(.data$p_value)
+      feature          = factor(.data$feature, levels = rev(.data$feature)),
+      neg_log10_p_adj  = -log10(.data$p_adjust_bh)
    )
 
 top_rppa_plot <- top_rppa_plot_data %>%
-   ggplot2::ggplot(ggplot2::aes(x = feature, y = neg_log10_p)) +
+   ggplot2::ggplot(ggplot2::aes(x = feature, y = neg_log10_p_adj)) +
    ggplot2::geom_col(fill = "#41AB5D", width = 0.7) +
    ggplot2::coord_flip() +
    ggplot2::labs(
-      x = NULL,
-      y = "-log10 Cox p-value",
+      x     = NULL,
+      y     = "-log10 BH-adjusted p-value",
       title = "Top RPPA survival-associated proteins"
    ) +
    ggplot2::theme_minimal(base_size = 12)
 
 ggplot2::ggsave(
    filename = "figures/top_rppa_features.png",
-   plot = top_rppa_plot,
-   width = 7,
-   height = 4.8,
-   dpi = 300
+   plot     = top_rppa_plot,
+   width    = 7,
+   height   = 4.8,
+   dpi      = 300
 )
 
 
 # Kaplan-Meier split for the top RPPA feature ---------------------------------
 # Dichotomising a continuous feature loses information, so this is used only as
 # an interpretable visualisation of the strongest screened RPPA association.
+# selected_rppa_features is ordered by BH-adjusted p-value (ascending), so
+# [[1]] is the most significant feature after FDR correction, consistent with
+# the top row of rppa_univariable_results.
 
 top_rppa_feature <- selected_rppa_features[[1]]
 
@@ -119,14 +127,14 @@ top_rppa_km_fit <- survival::survfit(
 
 top_rppa_km_plot <- survminer::ggsurvplot(
    top_rppa_km_fit,
-   data = top_rppa_km_data,
-   risk.table = TRUE,
-   pval = TRUE,
+   data         = top_rppa_km_data,
+   risk.table   = TRUE,
+   pval         = TRUE,
    legend.title = top_rppa_feature,
-   legend.labs = c("Low", "High"),
-   xlab = "Time (months)",
-   ylab = "Overall survival probability",
-   title = paste("Overall survival by", top_rppa_feature, "expression")
+   legend.labs  = c("Low", "High"),
+   xlab         = "Time (months)",
+   ylab         = "Overall survival probability",
+   title        = paste("Overall survival by", top_rppa_feature, "expression")
 )
 
 png("figures/top_rppa_kaplan_meier.png", width = 1800, height = 1600, res = 220)
@@ -139,6 +147,14 @@ dev.off()
 best_model <- model_comparison_results %>%
    dplyr::slice_max(.data$c_index, n = 1, with_ties = FALSE)
 
+if (nrow(model_comparison_results) > 1 &&
+    sum(model_comparison_results$c_index == best_model$c_index) > 1) {
+   message(
+      "Note: multiple models share the highest C-index (",
+      round(best_model$c_index, 3), "); '", best_model$model, "' reported arbitrarily."
+   )
+}
+
 top_rppa <- rppa_univariable_results %>%
    dplyr::slice_head(n = 1)
 
@@ -148,19 +164,19 @@ report_key_findings <- tibble::tibble(
       "analysis_events",
       "top_rppa_feature",
       "top_rppa_hazard_ratio",
-      "top_rppa_p_value",
+      "top_rppa_p_adjust_bh",
       "best_model",
       "best_model_c_index"
    ),
-   value = c(
-      as.character(nrow(survival_data)),
-      as.character(sum(survival_data$os_event)),
+   value = as.character(c(
+      nrow(survival_data),
+      sum(survival_data$os_event),
       top_rppa$feature,
-      as.character(round(top_rppa$hazard_ratio, 3)),
-      signif(top_rppa$p_value, 3),
+      round(top_rppa$hazard_ratio, 3),
+      signif(top_rppa$p_adjust_bh, 3),
       best_model$model,
-      as.character(round(best_model$c_index, 3))
-   )
+      round(best_model$c_index, 3)
+   ))
 )
 
 readr::write_csv(report_key_findings, "results/report_key_findings.csv")
