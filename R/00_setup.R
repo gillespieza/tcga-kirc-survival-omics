@@ -1,9 +1,9 @@
 # Project package setup and configuration -------------------------------------
 #
-# Bootstraps the R environment for the TCGA KIRC survival analysis project.
-# Checks for and installs any missing CRAN packages, loads the core libraries
-# required by downstream scripts, and declares project-level constants for the
-# study identifier and raw data file paths.
+# Bootstraps the R environment for this TCGA KIRC survival analysis mini ML 
+# project. Checks for and installs any missing CRAN packages, loads the core 
+# libraries required by downstream scripts, and declares project-level constants 
+# for the study identifier and raw data file paths.
 #
 # Packages installed/loaded:
 #   tidyverse - Data manipulation and visualisation (dplyr, ggplot2, stringr, etc.)
