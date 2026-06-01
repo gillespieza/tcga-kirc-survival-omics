@@ -1,41 +1,34 @@
-#' @file        00_setup.R
-#' @title       Project Package Setup and Configuration
-#' @description Bootstraps the R environment for the TCGA KIRC survival
-#'              analysis project. Checks for and installs any missing CRAN
-#'              packages, loads the core libraries required by downstream
-#'              scripts, and declares project-level constants for the study
-#'              identifier and raw data file paths.
-#'
-#' @details
-#'   Packages installed/loaded:
-#'   - tidyverse  : Data manipulation and visualisation (dplyr, ggplot2, stringr, etc.)
-#'   - ggpubr     : Publication-ready plot helpers (dependency of survminer)
-#'   - car        : Statistical utilities (dependency of ggpubr)
-#'   - markdown   : Markdown rendering (dependency of plotting/report helpers)
-#'   - survival   : Core survival-analysis models (Surv, coxph, etc.)
-#'   - survminer  : Kaplan-Meier plots and survival-curve visualisation
-#'   - glmnet     : Penalised regression, including LASSO Cox models
-#'
-#'   Global constants defined:
-#'   - study_id              : cBioPortal study identifier
-#'                             ("kirc_tcga_pan_can_atlas_2018")
-#'   - clinical_patient_file : Path to patient-level clinical data
-#'   - clinical_sample_file  : Path to sample-level clinical data
-#'   - mutation_file         : Path to somatic mutation data
-#'   - cna_file              : Path to copy-number alteration data
-#'   - rppa_file             : Path to RPPA protein expression z-scores
-#'
-#' @note   Data files are expected to be pre-downloaded from cBioPortal and
-#'         stored under data/ so that the analysis can be reproduced without
-#'         a live API connection.
-#'
-#' @note   A global random seed is set here to ensure reproducibility of any
-#'         stochastic steps (e.g. glmnet cross-validation) across all
-#'         downstream scripts.
-#'
-#' @source https://www.cbioportal.org/study/summary?id=kirc_tcga_pan_can_atlas_2018
-#'
-#' @usage  source("00_setup.R")  # Call before any other project script
+# Project package setup and configuration -------------------------------------
+#
+# Bootstraps the R environment for the TCGA KIRC survival analysis project.
+# Checks for and installs any missing CRAN packages, loads the core libraries
+# required by downstream scripts, and declares project-level constants for the
+# study identifier and raw data file paths.
+#
+# Packages installed/loaded:
+#   tidyverse - Data manipulation and visualisation (dplyr, ggplot2, stringr, etc.)
+#   ggpubr    - Publication-ready plot helpers (dependency of survminer)
+#   car       - Statistical utilities (dependency of ggpubr)
+#   markdown  - Markdown rendering (dependency of plotting/report helpers)
+#   survival  - Core survival-analysis models (Surv, coxph, etc.)
+#   survminer - Kaplan-Meier plots and survival-curve visualisation
+#   glmnet    - Penalised regression, including LASSO Cox models
+#
+# Global constants defined:
+#   study_id              - cBioPortal study identifier
+#   clinical_patient_file - Path to patient-level clinical data
+#   clinical_sample_file  - Path to sample-level clinical data
+#   mutation_file         - Path to somatic mutation data
+#   cna_file              - Path to copy-number alteration data
+#   rppa_file             - Path to RPPA protein expression z-scores
+#
+# Note: data files must be pre-downloaded from cBioPortal and placed in data/
+# so the analysis can be reproduced without a live API connection. A global
+# random seed is set here to ensure reproducibility of stochastic steps
+# (e.g. glmnet cross-validation) across all downstream scripts.
+#
+# Source: https://www.cbioportal.org/study/summary?id=kirc_tcga_pan_can_atlas_2018
+# Usage:  source("00_setup.R")  # call before any other project script
 
 
 # R version guard -------------------------------------------------------------

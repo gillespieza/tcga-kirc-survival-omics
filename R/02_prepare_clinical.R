@@ -1,48 +1,36 @@
-#' @file        02_prepare_clinical.R
-#' @title       Prepare Clinical Survival Data
-#' @description Merges patient-level and sample-level clinical tables into a
-#'              single analysis-ready survival tibble. Renames columns to tidy
-#'              snake_case names, coerces types, derives the overall survival
-#'              event indicator, encodes categorical variables as ordered or
-#'              unordered factors with explicit levels, removes records with
-#'              missing survival information, and prints a summary of the
-#'              resulting cohort.
-#'
-#' @details
-#'   Objects created in the global environment:
-#'   \describe{
-#'     \item{clinical_data}{Wide tibble produced by left-joining
-#'           \code{clinical_sample} onto \code{clinical_patient} by
-#'           \code{PATIENT_ID}. One row per sample.}
-#'     \item{clinical_survival}{Analysis-ready survival tibble with tidy
-#'           column names. Retains only records with non-missing
-#'           \code{os_months} and \code{os_event}. One row per sample.}
-#'     \item{clinical_survival_summary}{Single-row tibble summarising patient
-#'           and event counts and median follow-up duration.}
-#'   }
-#'
-#'   Columns in \code{clinical_survival}:
-#'   \describe{
-#'     \item{patient_id}{Character. TCGA patient barcode.}
-#'     \item{sample_id}{Character. TCGA sample barcode.}
-#'     \item{os_months}{Numeric. Overall survival time in months.}
-#'     \item{os_event}{Integer. Overall survival event indicator
-#'           (1 = death, 0 = censored/alive).}
-#'     \item{age}{Numeric. Age at diagnosis in years.}
-#'     \item{sex}{Factor. Patient sex.}
-#'     \item{stage}{Ordered factor. AJCC pathologic tumour stage
-#'           (STAGE I < STAGE II < STAGE III < STAGE IV).}
-#'     \item{grade}{Ordered factor. Tumour grade (G1 < G2 < G3 < G4).
-#'           Records with grade "GX" (not assessable) are recoded to NA.}
-#'   }
-#'
-#' @pre  01_load_data.R must be sourced first so that \code{clinical_patient}
-#'       and \code{clinical_sample} are available in the global environment.
-#'
-#' @post \code{clinical_survival} is available for use by downstream
-#'       analysis and modelling scripts.
-#'
-#' @usage source("02_prepare_clinical.R")
+# Prepare clinical survival data ----------------------------------------------
+#
+# Merges patient-level and sample-level clinical tables into a single
+# analysis-ready survival tibble. Renames columns to tidy snake_case names,
+# coerces types, derives the overall survival event indicator, encodes
+# categorical variables as ordered or unordered factors with explicit levels,
+# removes records with missing survival information, and prints a summary of
+# the resulting cohort.
+#
+# Requires: 01_load_data.R to have been sourced so that clinical_patient and
+#   clinical_sample are available in the global environment.
+#
+# Produces:
+#   clinical_data             - Wide tibble from left-joining clinical_sample
+#                               onto clinical_patient by PATIENT_ID. One row
+#                               per sample.
+#   clinical_survival         - Analysis-ready survival tibble with tidy column
+#                               names. Records with missing os_months or
+#                               os_event are dropped. One row per sample.
+#                               Columns:
+#                                 patient_id - TCGA patient barcode
+#                                 sample_id  - TCGA sample barcode
+#                                 os_months  - Overall survival time (months)
+#                                 os_event   - Event indicator (1=death, 0=censored)
+#                                 age        - Age at diagnosis (years)
+#                                 sex        - Factor
+#                                 stage      - Ordered factor (STAGE I < II < III < IV)
+#                                 grade      - Ordered factor (G1 < G2 < G3 < G4);
+#                                              GX (not assessable) recoded to NA
+#   clinical_survival_summary - Single-row tibble of patient/event counts and
+#                               median follow-up duration.
+#
+# Usage: source("02_prepare_clinical.R")
 
 
 # Validate join keys ----------------------------------------------------------
@@ -77,7 +65,7 @@ if (nrow(clinical_data) != n_samples_before) {
    )
 }
 
-# Validate all columns needed for transmute against the joined table ----------
+# Validate all columns needed for transmute against the joined table.
 # Checked here rather than before the join since columns may come from either
 # source table.
 
@@ -88,8 +76,10 @@ required_cols <- c(
 missing_cols <- setdiff(required_cols, names(clinical_data))
 
 if (length(missing_cols) > 0) {
-   stop("Joined clinical_data is missing expected column(s): ",
-        paste(missing_cols, collapse = ", "))
+   stop(
+      "Joined clinical_data is missing expected column(s): ",
+      paste(missing_cols, collapse = ", ")
+   )
 }
 
 message("Joined clinical tables: ", nrow(clinical_data), " rows x ",
@@ -112,16 +102,20 @@ unexpected_stages <- setdiff(
 )
 unexpected_grades <- setdiff(
    unique(na.omit(clinical_data$GRADE)),
-   c(grade_levels, "GX")   # GX is expected — intentionally recoded to NA
+   c(grade_levels, "GX")  # GX is expected — intentionally recoded to NA
 )
 
 if (length(unexpected_stages) > 0) {
-   warning("Unexpected AJCC stage value(s) will be coerced to NA: ",
-           paste(unexpected_stages, collapse = ", "))
+   warning(
+      "Unexpected AJCC stage value(s) will be coerced to NA: ",
+      paste(unexpected_stages, collapse = ", ")
+   )
 }
 if (length(unexpected_grades) > 0) {
-   warning("Unexpected GRADE value(s) will be coerced to NA: ",
-           paste(unexpected_grades, collapse = ", "))
+   warning(
+      "Unexpected GRADE value(s) will be coerced to NA: ",
+      paste(unexpected_grades, collapse = ", ")
+   )
 }
 
 n_before_filter <- nrow(clinical_data)
@@ -161,7 +155,6 @@ clinical_survival <- clinical_data %>%
          ordered = TRUE
       )
    ) %>%
-   # Keep only patients with usable overall survival time and status
    dplyr::filter(!is.na(.data$os_months), !is.na(.data$os_event))
 
 n_dropped <- n_before_filter - nrow(clinical_survival)

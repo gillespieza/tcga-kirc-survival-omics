@@ -1,45 +1,28 @@
-#' @file        03_prepare_rppa.R
-#' @title       Prepare RPPA Proteomics Data
-#' @description Reshapes the raw RPPA data from a wide feature-by-sample matrix
-#'              into a tidy sample-by-feature tibble ready for modelling.
-#'              Parses the composite feature identifier into gene symbol and
-#'              protein feature components, sanitises feature names for use as
-#'              column names, and pivots to one row per tumour sample.
-#'
-#' @details
-#'   Input:
-#'   \describe{
-#'     \item{rppa_data}{Wide tibble with one row per antibody/protein feature
-#'           and one column per tumour sample. The first column,
-#'           \code{Composite.Element.REF}, identifies each feature in the
-#'           format \code{GENE|Antibody-Name}.}
-#'   }
-#'
-#'   Objects created in the global environment:
-#'   \describe{
-#'     \item{rppa_proteomics}{Sample-by-feature tibble. One row per tumour
-#'           sample (\code{sample_id}) and one column per sanitised protein
-#'           feature, containing RPPA z-scores.}
-#'   }
-#'
-#'   Transformation steps:
-#'   \enumerate{
-#'     \item Validate input dimensions and feature name uniqueness.
-#'     \item Pivot to long format (one row per sample-feature combination).
-#'     \item Parse \code{Composite.Element.REF} into \code{gene_symbol} and
-#'           \code{protein_feature} on the \code{|} separator.
-#'     \item Sanitise feature names: replace non-alphanumeric characters with
-#'           underscores and strip trailing underscores.
-#'     \item Pivot back to wide format (one row per sample).
-#'   }
-#'
-#' @pre  01_load_data.R must be sourced first so that \code{rppa_data} is
-#'       available in the global environment.
-#'
-#' @post \code{rppa_proteomics} is available for use by downstream feature
-#'       selection and modelling scripts.
-#'
-#' @usage source("03_prepare_rppa.R")
+# Prepare RPPA proteomics data ------------------------------------------------
+#
+# Reshapes the raw RPPA data from a wide feature-by-sample matrix into a tidy
+# sample-by-feature tibble ready for modelling. Parses the composite feature
+# identifier into gene symbol and protein feature components, sanitises feature
+# names for use as column names, and pivots to one row per tumour sample.
+#
+# Requires: 01_load_data.R to have been sourced so that rppa_data is available
+#   in the global environment.
+#
+# Produces:
+#   rppa_proteomics - Sample-by-feature tibble. One row per tumour sample
+#                     (sample_id) and one column per sanitised protein feature,
+#                     containing RPPA z-scores.
+#
+# Transformation steps:
+#   1. Validate input dimensions and feature name uniqueness.
+#   2. Pivot to long format (one row per sample-feature combination).
+#   3. Parse Composite.Element.REF into gene_symbol and protein_feature on
+#      the | separator.
+#   4. Sanitise feature names: replace non-alphanumeric characters with
+#      underscores and strip trailing underscores.
+#   5. Pivot back to wide format (one row per sample).
+#
+# Usage: source("03_prepare_rppa.R")
 
 
 # Validate input --------------------------------------------------------------
@@ -49,7 +32,7 @@ if (!"Composite.Element.REF" %in% names(rppa_data)) {
 }
 
 n_features <- nrow(rppa_data)
-n_samples  <- ncol(rppa_data) - 1L   # exclude the Composite.Element.REF column
+n_samples  <- ncol(rppa_data) - 1L  # exclude the Composite.Element.REF column
 
 message("Input RPPA data: ", n_features, " features x ", n_samples, " samples.")
 
@@ -74,7 +57,6 @@ if (length(duplicated_names) > 0) {
 
 
 # Prepare RPPA proteomics table -----------------------------------------------
-
 # Convert RPPA from wide feature-by-sample to sample-by-feature:
 #   1. Pivot to long (one row per sample-feature combination)
 #   2. Parse Composite.Element.REF into gene_symbol | protein_feature
@@ -96,7 +78,9 @@ rppa_proteomics <- rppa_data %>%
       fill   = "right"
    ) %>%
    mutate(
-      # Sanitise protein feature names, make safe to use as column names later
+      # Sanitise feature names: replace non-alphanumeric runs with underscores
+      # and strip trailing underscores. Logic must match the pre-pivot collision
+      # check above.
       protein_feature_clean = Composite.Element.REF %>%
          stringr::str_replace_all("[^A-Za-z0-9]+", "_") %>%
          stringr::str_remove("_+$")

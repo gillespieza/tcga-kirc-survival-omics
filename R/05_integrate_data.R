@@ -1,46 +1,30 @@
-#' @file        05_integrate_data.R
-#' @title       Integrate Clinical, RPPA, and Mutation Data
-#' @description Combines the prepared clinical survival, RPPA proteomics, and
-#'              binary mutation feature tables into a single analysis-ready
-#'              tibble. Clinical and RPPA tables are inner-joined on sample ID
-#'              to retain only samples with both data types. Mutation features
-#'              are left-joined so that samples absent from the mutation table
-#'              (i.e. wild-type for all selected driver genes) are retained and
-#'              coded as 0.
-#'
-#' @details
-#'   Inputs:
-#'   \describe{
-#'     \item{clinical_survival}{Analysis-ready survival tibble. One row per
-#'           sample. Produced by 02_prepare_clinical.R.}
-#'     \item{rppa_proteomics}{Sample-by-feature RPPA z-score tibble. One row
-#'           per sample. Produced by 03_prepare_rppa.R.}
-#'     \item{mutation_features}{Sample-by-gene binary mutation tibble. One row
-#'           per sample with at least one driver gene mutation. Produced by
-#'           04_prepare_mutations.R.}
-#'   }
-#'
-#'   Objects created in the global environment:
-#'   \describe{
-#'     \item{clinical_rppa}{Tibble combining clinical survival variables and
-#'           RPPA protein z-score features. One row per sample present in
-#'           both \code{clinical_survival} and \code{rppa_proteomics}
-#'           (inner join).}
-#'     \item{clinical_rppa_mutation}{Fully integrated analysis tibble.
-#'           Extends \code{clinical_rppa} with binary driver gene mutation
-#'           features. Samples absent from \code{mutation_features} are
-#'           retained with their mutation columns set to 0 (not mutated).}
-#'   }
-#'
-#' @pre  02_prepare_clinical.R, 03_prepare_rppa.R, and
-#'       04_prepare_mutations.R must be sourced first so that
-#'       \code{clinical_survival}, \code{rppa_proteomics}, and
-#'       \code{mutation_features} are available in the global environment.
-#'
-#' @post \code{clinical_rppa_mutation} is the primary analysis dataset for
-#'       downstream modelling scripts.
-#'
-#' @usage source("05_integrate_data.R")
+# Integrate clinical, RPPA, and mutation data ---------------------------------
+#
+# Combines the prepared clinical survival, RPPA proteomics, and binary mutation
+# feature tables into a single analysis-ready tibble. Clinical and RPPA tables
+# are inner-joined on sample ID to retain only samples with both data types.
+# Mutation features are left-joined so that samples absent from the mutation
+# table (i.e. wild-type for all selected driver genes) are retained and coded
+# as 0.
+#
+# Requires: 02_prepare_clinical.R, 03_prepare_rppa.R, and
+#   04_prepare_mutations.R to have been sourced so that clinical_survival,
+#   rppa_proteomics, and mutation_features are available in the global
+#   environment.
+#
+# Produces:
+#   clinical_rppa          - Tibble combining clinical survival variables and
+#                            RPPA protein z-score features. One row per sample
+#                            present in both clinical_survival and
+#                            rppa_proteomics (inner join).
+#   clinical_rppa_mutation - Fully integrated analysis tibble. Extends
+#                            clinical_rppa with binary driver gene mutation
+#                            features. Samples absent from mutation_features
+#                            are retained with mutation columns set to 0.
+#                            This is the primary dataset for downstream
+#                            modelling scripts.
+#
+# Usage: source("05_integrate_data.R")
 
 
 # Validate inputs -------------------------------------------------------------

@@ -1,44 +1,28 @@
-#' @file        04_prepare_mutations.R
-#' @title       Prepare Binary Mutation Features
-#' @description Derives a sample-by-gene binary mutation feature table from the
-#'              raw somatic mutation data. Restricts to a curated set of
-#'              established ccRCC driver genes, converts the long mutation table
-#'              to a wide binary matrix (1 = mutated, 0 = not mutated), and
-#'              ensures all driver genes are represented as columns even if
-#'              absent from the data.
-#'
-#' @details
-#'   Input:
-#'   \describe{
-#'     \item{mutation_data}{Long tibble of somatic mutation calls. Must contain
-#'           columns \code{Tumor_Sample_Barcode} and \code{Hugo_Symbol}.}
-#'   }
-#'
-#'   Objects created in the global environment:
-#'   \describe{
-#'     \item{driver_genes}{Character vector of curated ccRCC driver gene
-#'           symbols used to filter the mutation data.}
-#'     \item{mutation_features}{Sample-by-gene binary tibble. One row per
-#'           tumour sample (\code{sample_id}) and one column per driver gene
-#'           (prefixed with \code{mut_}), ordered to match
-#'           \code{driver_genes}.}
-#'   }
-#'
-#'   Driver gene selection is based on:
-#'   \itemize{
-#'     \item Comprehensive molecular characterisation of clear cell RCC
-#'           (doi:10.1038/nature12222)
-#'     \item Actionable mutations in metastatic RCC
-#'           (doi:10.1158/1078-0432.CCR-15-2631)
-#'   }
-#'
-#' @pre  01_load_data.R must be sourced first so that \code{mutation_data} is
-#'       available in the global environment.
-#'
-#' @post \code{mutation_features} is available for use by downstream feature
-#'       integration and modelling scripts.
-#'
-#' @usage source("04_prepare_mutations.R")
+# Prepare binary mutation features --------------------------------------------
+#
+# Derives a sample-by-gene binary mutation feature table from the raw somatic
+# mutation data. Restricts to a curated set of established ccRCC driver genes,
+# converts the long mutation table to a wide binary matrix (1 = mutated,
+# 0 = not mutated), and ensures all driver genes are represented as columns
+# even if absent from the data.
+#
+# Requires: 01_load_data.R to have been sourced so that mutation_data is
+#   available in the global environment.
+#
+# Produces:
+#   driver_genes       - Character vector of curated ccRCC driver gene symbols
+#                        used to filter the mutation data.
+#   mutation_features  - Sample-by-gene binary tibble. One row per tumour
+#                        sample (sample_id) and one column per driver gene
+#                        (prefixed with mut_), ordered to match driver_genes.
+#
+# Driver gene selection is based on:
+#   - Comprehensive molecular characterisation of clear cell RCC
+#     (doi:10.1038/nature12222)
+#   - Actionable mutations in metastatic RCC
+#     (doi:10.1158/1078-0432.CCR-15-2631)
+#
+# Usage: source("04_prepare_mutations.R")
 
 
 # Validate input --------------------------------------------------------------
@@ -47,8 +31,10 @@ required_mutation_cols <- c("Tumor_Sample_Barcode", "Hugo_Symbol")
 missing_mutation_cols  <- setdiff(required_mutation_cols, names(mutation_data))
 
 if (length(missing_mutation_cols) > 0) {
-   stop("mutation_data is missing expected column(s): ",
-        paste(missing_mutation_cols, collapse = ", "))
+   stop(
+      "mutation_data is missing expected column(s): ",
+      paste(missing_mutation_cols, collapse = ", ")
+   )
 }
 
 message("Input mutation data: ", nrow(mutation_data), " rows x ",
@@ -131,10 +117,9 @@ mutation_features <- mutation_features %>%
 # Validate output -------------------------------------------------------------
 
 stopifnot(
-   "mutation_features must be non-empty"      = nrow(mutation_features) > 0,
-   "mutation_features must contain sample_id" = "sample_id" %in% names(mutation_features),
-   "mutation_features must have all driver gene columns" =
-      all(all_mut_cols %in% names(mutation_features))
+   "mutation_features must be non-empty"                 = nrow(mutation_features) > 0,
+   "mutation_features must contain sample_id"            = "sample_id" %in% names(mutation_features),
+   "mutation_features must have all driver gene columns" = all(all_mut_cols %in% names(mutation_features))
 )
 
 
@@ -148,7 +133,7 @@ mutation_summary <- mutation_features %>%
       values_to = "n_mutated"
    ) %>%
    dplyr::mutate(
-      gene       = stringr::str_remove(.data$gene, "^mut_"),
+      gene        = stringr::str_remove(.data$gene, "^mut_"),
       pct_mutated = round(100 * .data$n_mutated / nrow(mutation_features), 1)
    ) %>%
    dplyr::arrange(dplyr::desc(.data$n_mutated))

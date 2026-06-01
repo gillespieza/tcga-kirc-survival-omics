@@ -1,30 +1,24 @@
-#' @file        run_analysis.R
-#' @title       Run Full Analysis Workflow
-#' @description Orchestrates the complete TCGA KIRC survival analysis pipeline
-#'              by sourcing each numbered script in sequence. Each step is
-#'              timed and wrapped in error handling so that failures surface
-#'              with a clear step name and the underlying error message, rather
-#'              than a bare R traceback.
-#'
-#' @details
-#'   Pipeline steps executed in order:
-#'   \enumerate{
-#'     \item \code{00_setup.R}           — Install/load packages; define paths
-#'     \item \code{01_load_data.R}       — Load raw cBioPortal data files
-#'     \item \code{02_prepare_clinical.R} — Build clinical survival table
-#'     \item \code{03_prepare_rppa.R}    — Reshape and clean RPPA data
-#'     \item \code{04_prepare_mutations.R} — Build binary mutation feature table
-#'     \item \code{05_integrate_data.R}  — Integrate all data layers
-#'   }
-#'
-#' @note  This script must be run from the project root directory (the folder
-#'        containing the \code{R/} subdirectory), or via an RStudio project
-#'        (\code{.Rproj}) which sets the working directory automatically.
-#'        Running from any other location will cause the \code{source()} calls
-#'        to fail with a "cannot open file" error.
-#'
-#' @usage source("run_analysis.R")
-#' @usage Rscript run_analysis.R
+# Run full analysis workflow ---------------------------------------------------
+#
+# Orchestrates the complete TCGA KIRC survival analysis pipeline by sourcing
+# each numbered script in sequence. Each step is timed and wrapped in error
+# handling so that failures surface with a clear step name and error message
+# rather than a bare R traceback.
+#
+# Pipeline steps:
+#   00_setup.R             - Install/load packages; define paths
+#   01_load_data.R         - Load raw cBioPortal data files
+#   02_prepare_clinical.R  - Build clinical survival table
+#   03_prepare_rppa.R      - Reshape and clean RPPA data
+#   04_prepare_mutations.R - Build binary mutation feature table
+#   05_integrate_data.R    - Integrate all data layers
+#
+# Usage:
+#   source("run_analysis.R")
+#   Rscript run_analysis.R
+#
+# Note: must be run from the project root (the folder containing R/), or via
+# an RStudio project (.Rproj) which sets the working directory automatically.
 
 
 # Verify working directory ----------------------------------------------------
@@ -41,11 +35,10 @@ if (!dir.exists("R")) {
 
 
 # Pipeline helper -------------------------------------------------------------
+# Sources a script with per-step timing and error handling. Failures re-throw
+# with the step name and script path prepended to the error message so the
+# point of failure is immediately clear in the console output.
 
-#' Source a pipeline step with timing and error handling
-#'
-#' @param path      Character. Relative path to the R script to source.
-#' @param step_name Character. Human-readable label used in log messages.
 source_step <- function(path, step_name) {
    message("\n", strrep("-", 60))
    message("Step: ", step_name)
@@ -71,12 +64,12 @@ source_step <- function(path, step_name) {
 
 t_pipeline_start <- proc.time()
 
-source_step("R/00_setup.R",             "Package setup and configuration")
-source_step("R/01_load_data.R",         "Load raw cBioPortal data")
-source_step("R/02_prepare_clinical.R",  "Prepare clinical survival table")
-source_step("R/03_prepare_rppa.R",      "Prepare RPPA proteomics data")
-source_step("R/04_prepare_mutations.R", "Prepare binary mutation features")
-source_step("R/05_integrate_data.R",    "Integrate all data layers")
+source_step("R/00_setup.R",              "Package setup and configuration")
+source_step("R/01_load_data.R",          "Load raw cBioPortal data")
+source_step("R/02_prepare_clinical.R",   "Prepare clinical survival table")
+source_step("R/03_prepare_rppa.R",       "Prepare RPPA proteomics data")
+source_step("R/04_prepare_mutations.R",  "Prepare binary mutation features")
+source_step("R/05_integrate_data.R",     "Integrate all data layers")
 
 total_elapsed <- round((proc.time() - t_pipeline_start)[["elapsed"]], 1)
 
