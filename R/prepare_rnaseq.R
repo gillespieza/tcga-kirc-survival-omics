@@ -69,13 +69,13 @@ gene_set_queries <- tibble::tibble(
 fetch_gene_set <- function(query_name, collection, pattern) {
    msig_tbl <- msigdbr::msigdbr(
       species = "Homo sapiens",
-      category = collection
+      collection = collection
    ) |>
       dplyr::select(gs_name, gene_symbol)
    
    if (nrow(msig_tbl) == 0) {
       stop(
-         "Empty MSigDB result for category: ",
+         "Empty MSigDB result for collection: ",
          collection,
          call. = FALSE
       )
