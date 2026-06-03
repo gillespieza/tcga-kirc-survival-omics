@@ -30,14 +30,13 @@
 
 
 # Verify working directory ----------------------------------------------------
-# Catch the most common failure mode (wrong working directory) before any
-# script is sourced.
-
+# Check that the script is being run from the project root.
 if (!dir.exists("R")) {
    stop(
-      "Directory 'R/' not found. ",
-      "run_analysis.R must be run from the project root. ",
-      "Current working directory: ", getwd()
+      "Directory 'R' not found.\n",
+      "run_analysis.R must be run from the project root.\n",
+      "Current working directory: ", getwd(),
+      call. = FALSE
    )
 }
 
@@ -80,21 +79,88 @@ source_step <- function(path, step_name) {
 
 
 # Run pipeline ----------------------------------------------------------------
+# Define the pipeline order in one place.
+pipeline_steps <- list(
+   list(
+      path = "R/setup.R",
+      step_name = "Package setup and configuration"
+   ),
+   list(
+      path = "R/load_data.R",
+      step_name = "Load raw cBioPortal data"
+   ),
+   list(
+      path = "R/prepare_clinical.R",
+      step_name = "Prepare clinical survival table"
+   ),
+   list(
+      path = "R/prepare_rppa.R",
+      step_name = "Prepare RPPA proteomics data"
+   ),
+   list(
+      path = "R/prepare_rnaseq.R",
+      step_name = "Prepare RNA-seq data"
+   ),
+   list(
+      path = "R/prepare_mutations.R",
+      step_name = "Prepare binary mutation features"
+   ),
+   list(
+      path = "R/integrate_data.R",
+      step_name = "Integrate all data layers"
+   ),
+   list(
+      path = "R/quick_survival_check.R",
+      step_name = "Quick survival check"
+   ),
+   list(
+      path = "R/feature_selection.R",
+      step_name = "Screen RPPA for features"
+   ),
+   list(
+      path = "R/pathway_scores.R",
+      step_name = "Calculate pathway scores"
+   ),
+   list(
+      path = "R/survival_models.R",
+      step_name = "Compare survival models"
+   ),
+   list(
+      path = "R/results_figures.R",
+      step_name = "Create report-ready outputs"
+   )
+)
 
+# Check that all expected script files exist before starting.
+missing_scripts <- vapply(
+   pipeline_steps,
+   function(step) !file.exists(step$path),
+   logical(1)
+)
+
+if (any(missing_scripts)) {
+   missing_paths <- vapply(
+      pipeline_steps[missing_scripts],
+      function(step) step$path,
+      character(1)
+   )
+   
+   stop(
+      "The following pipeline scripts were not found:\n",
+      paste(missing_paths, collapse = "\n"),
+      call. = FALSE
+   )
+}
+
+# Run the full pipeline.
 t_pipeline_start <- proc.time()
 
-source_step("R/00_setup.R",                "Package setup and configuration")
-source_step("R/01_load_data.R",            "Load raw cBioPortal data")
-source_step("R/02_prepare_clinical.R",     "Prepare clinical survival table")
-source_step("R/03_prepare_rppa.R",         "Prepare RPPA proteomics data")
-source_step("R/03b_prepare_rnaseq.R",      "Prepare RNA seq data")
-source_step("R/04_prepare_mutations.R",    "Prepare binary mutation features")
-source_step("R/05_integrate_data.R",       "Integrate all data layers")
-source_step("R/06_quick_survival_check.R", "Quick survival check")
-source_step("R/07_feature_selection.R",    "Screen RPPA for features")
-source_step("R/07b_pathway_scores.R",      "Pathway Scores")
-source_step("R/08_survival_models.R",      "Compare survival models")
-source_step("R/09_results_figures.R",      "Create report-ready outputs")
+for (step in pipeline_steps) {
+   source_step(
+      path = step$path,
+      step_name = step$step_name
+   )
+}
 
 total_elapsed <- round((proc.time() - t_pipeline_start)[["elapsed"]], 1)
 
@@ -107,7 +173,16 @@ message(strrep("=", 60))
 # Written to results/ on every successful run for reproducibility. Captures
 # R version, platform, and all loaded package versions.
 
-if (!dir.exists("results")) dir.create("results", recursive = TRUE)
-session_info_path <- "results/session_info.txt"
-writeLines(capture.output(sessionInfo()), session_info_path)
+# Save session information for reproducibility.
+if (!dir.exists("results")) {
+   dir.create("results", recursive = TRUE)
+}
+
+session_info_path <- file.path("results", "session_info.txt")
+
+writeLines(
+   text = capture.output(sessionInfo()),
+   con = session_info_path
+)
+
 message("Session info written to ", session_info_path)

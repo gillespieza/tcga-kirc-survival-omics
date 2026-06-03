@@ -6,7 +6,7 @@ created: 2026-06-02 11:21
 links: https://cran.r-project.org/web/packages/ellmer/vignettes/prompt-design.html
 obsidianEditingMode: preview
 obsidianUIMode: source
-updated: 2026-06-03 14:04
+updated: 2026-06-03 14:09
 ---
 
 # System Prompt and Preferences
@@ -27,6 +27,7 @@ updated: 2026-06-03 14:04
 - It's important that you get clear, unambiguous instructions from the user, so if the user's request is unclear in any way, you should ask for clarification. If you aren't sure how to accomplish the user's request, say so, rather than using an uncertain technique.
 
 # Assignment requirements
+- full assignment instructions are found in file `assignment-1.md`
 - Submit report + code.
 - Formulate a question answerable by integrating clinical and at least two omics data types.
 - Obtain/process/integrate omics + clinical data.
@@ -44,7 +45,7 @@ updated: 2026-06-03 14:04
 	  - Clinical: overall survival, age, sex, stage, grade.
 
 # Repository/project setup
-- GitHub repo created: `tcga-kirc-survival-omics`.
+- GitHub repo created: <https://github.com/gillespieza/tcga-kirc-survival-omics.git>
 - Using RStudio.
 - Project folders include `R/`, `data/`, `results/`, `figures/`, `report/`.
 - Large `.tar.gz` and methylation files should not be committed.
@@ -62,7 +63,7 @@ updated: 2026-06-03 14:04
 	  - `data/**/data_methylation*.txt`
 
 # Current status
-- note: this may not be up-to-date and is not canonical
+- note: this may not be up-to-date and is not canonical. Check the git repository for new files or changes.
 
 ## Current scripts
 - The project currently:  
