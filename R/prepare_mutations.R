@@ -6,15 +6,14 @@
 # 0 = not mutated), and ensures all driver genes are represented as columns
 # even if absent from the data.
 #
-# Requires: 01_load_data.R to have been sourced so that mutation_data is
-#   available in the global environment.
+# Requires: load_data.R to have been sourced so that mutation_data is available
+#           in the global environment.
 #
 # Produces:
-#   driver_genes       - Character vector of curated ccRCC driver gene symbols
-#                        used to filter the mutation data.
-#   mutation_features  - Sample-by-gene binary tibble. One row per tumour
-#                        sample (sample_id) and one column per driver gene
-#                        (prefixed with mut_), ordered to match driver_genes.
+#   driver_genes      - Character vector of curated ccRCC driver gene symbols.
+#   mutation_features - Sample-by-gene binary tibble. One row per tumour
+#                       sample (sample_id) and one column per driver gene
+#                       (prefixed with mut_), ordered to match driver_genes.
 #
 # Driver gene selection is based on:
 #   - Comprehensive molecular characterisation of clear cell RCC
@@ -22,24 +21,51 @@
 #   - Actionable mutations in metastatic RCC
 #     (doi:10.1158/1078-0432.CCR-15-2631)
 #
-# Usage: source("04_prepare_mutations.R")
+# Usage: this script is intended to be sourced by run_analysis.R as part of
+#        the full pipeline, not run directly.
 
+# Small helper for consistent validation --------------------------------------
+
+abort_if_false <- function(condition, message_text) {
+   if (!condition) {
+      stop(message_text, call. = FALSE)
+   }
+}
 
 # Validate input --------------------------------------------------------------
 
-required_mutation_cols <- c("Tumor_Sample_Barcode", "Hugo_Symbol")
-missing_mutation_cols  <- setdiff(required_mutation_cols, names(mutation_data))
+abort_if_false(
+   exists("mutation_data"),
+   "mutation_data is missing. Source load_data.R via run_analysis.R first."
+)
 
-if (length(missing_mutation_cols) > 0) {
-   stop(
-      "mutation_data is missing expected column(s): ",
+required_mutation_cols <- c(
+   "Tumor_Sample_Barcode", 
+   "Hugo_Symbol"
+)
+missing_mutation_cols  <- setdiff(
+   required_mutation_cols, 
+   names(mutation_data)
+)
+
+abort_if_false(
+   length(missing_mutation_cols) == 0,
+   paste(
+      "mutation_data is missing expected column(s):",
       paste(missing_mutation_cols, collapse = ", ")
    )
-}
+)
 
-message("Input mutation data: ", nrow(mutation_data), " rows x ",
-        ncol(mutation_data), " cols.")
+abort_if_false(
+   nrow(mutation_data) > 0,
+   "mutation_data has zero rows after loading. Check data_mutations.txt."
+)
 
+message(
+   "Input mutation data: ",
+   nrow(mutation_data), " rows x ",
+   ncol(mutation_data), " cols."
+)
 
 # Define driver genes ---------------------------------------------------------
 # Commonly altered ccRCC genes selected from known kidney cancer biology.
@@ -57,22 +83,29 @@ driver_genes <- c(
    "TSC2"   # mTOR pathway regulator that functions with TSC1 to suppress mTORC1 signalling
 )
 
-
 # Convert long mutation table to binary sample-by-gene matrix ----------------
 # Each driver gene that appears at least once in a sample is counted as
 # mutated (1); all other driver genes are coded as not mutated (0).
-
-mutation_long <- mutation_data %>%
+mutation_long <- mutation_data |>
    dplyr::transmute(
       sample_id   = .data$Tumor_Sample_Barcode,
       gene_symbol = .data$Hugo_Symbol
-   ) %>%
-   dplyr::filter(.data$gene_symbol %in% driver_genes) %>%
-   dplyr::distinct(.data$sample_id, .data$gene_symbol)
+   ) |>
+   dplyr::filter(gene_symbol %in% driver_genes) |>
+   dplyr::distinct(sample_id, gene_symbol)
+
+abort_if_false(
+   nrow(mutation_long) > 0,
+   paste(
+      "No mutations in the selected driver genes were found in mutation_data.",
+      "Check that the study and driver_genes are correct."
+   )
+)
 
 # Warn early if any driver genes are entirely absent from the mutation data,
 # before the matrix step silently drops them.
 unobserved_genes <- setdiff(driver_genes, unique(mutation_long$gene_symbol))
+
 if (length(unobserved_genes) > 0) {
    message(
       "The following driver gene(s) have no mutations in this dataset and ",
@@ -81,19 +114,24 @@ if (length(unobserved_genes) > 0) {
    )
 }
 
-mutation_matrix <- table(
-   mutation_long$sample_id,
-   mutation_long$gene_symbol
-)
-
-mutation_features <- as.data.frame.matrix(mutation_matrix) %>%
-   tibble::rownames_to_column("sample_id") %>%
+# Count at least one mutation per sample/gene, pivot to wide, and binarise.
+mutation_features <- mutation_long |>
+   dplyr::count(
+      sample_id,
+      gene_symbol,
+      name = "mutated"
+   ) |>
+   tidyr::pivot_wider(
+      names_from  = gene_symbol,
+      values_from = mutated,
+      values_fill = 0L
+   ) |>
    dplyr::mutate(
       dplyr::across(
          -sample_id,
          ~ as.integer(.x > 0)
       )
-   ) %>%
+   ) |>
    dplyr::rename_with(
       ~ paste0("mut_", .x),
       -sample_id
@@ -102,6 +140,7 @@ mutation_features <- as.data.frame.matrix(mutation_matrix) %>%
 # Add all-zero columns for driver genes not observed in the mutation data,
 # so that the feature table is complete and consistently ordered regardless
 # of which genes happen to appear in this dataset.
+
 all_mut_cols     <- paste0("mut_", driver_genes)
 missing_mut_cols <- setdiff(all_mut_cols, names(mutation_features))
 
@@ -109,33 +148,49 @@ if (length(missing_mut_cols) > 0) {
    mutation_features[missing_mut_cols] <- 0L
 }
 
-# Reorder columns: sample_id first, then driver genes in their defined order.
-mutation_features <- mutation_features %>%
-   dplyr::select(sample_id, dplyr::all_of(all_mut_cols))
+mutation_features <- mutation_features |>
+   dplyr::select(
+      sample_id,
+      dplyr::all_of(all_mut_cols)
+   )
 
 
 # Validate output -------------------------------------------------------------
 
-stopifnot(
-   "mutation_features must be non-empty"                 = nrow(mutation_features) > 0,
-   "mutation_features must contain sample_id"            = "sample_id" %in% names(mutation_features),
-   "mutation_features must have all driver gene columns" = all(all_mut_cols %in% names(mutation_features))
+abort_if_false(
+   nrow(mutation_features) > 0,
+   "mutation_features must be non-empty."
+)
+
+abort_if_false(
+   "sample_id" %in% names(mutation_features),
+   "mutation_features must contain sample_id."
+)
+
+abort_if_false(
+   all(all_mut_cols %in% names(mutation_features)),
+   "mutation_features must have all driver gene columns."
 )
 
 
 # Summarise mutation frequencies ----------------------------------------------
 
-mutation_summary <- mutation_features %>%
-   dplyr::summarise(dplyr::across(dplyr::starts_with("mut_"), sum)) %>%
+mutation_summary <- mutation_features |>
+   dplyr::summarise(
+      dplyr::across(
+         dplyr::starts_with("mut_"),
+         sum
+      )
+   ) |>
    tidyr::pivot_longer(
       cols      = dplyr::everything(),
       names_to  = "gene",
       values_to = "n_mutated"
-   ) %>%
+   ) |>
    dplyr::mutate(
       gene        = stringr::str_remove(.data$gene, "^mut_"),
       pct_mutated = round(100 * .data$n_mutated / nrow(mutation_features), 1)
-   ) %>%
+   ) |>
    dplyr::arrange(dplyr::desc(.data$n_mutated))
 
 message(
@@ -143,4 +198,5 @@ message(
    nrow(mutation_features), " samples x ",
    length(all_mut_cols), " driver gene features."
 )
+
 print(mutation_summary)
