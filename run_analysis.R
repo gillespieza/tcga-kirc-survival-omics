@@ -63,19 +63,19 @@ log_message <- function(...) {
 # renaming files.
 
 pipeline_steps <- tibble::tribble(
-   ~path,                                ~step_name,
-   file.path("R", "setup.R"),            "Package setup and configuration",
-   file.path("R", "load_data.R"),        "Load raw cBioPortal data",
-   file.path("R", "prepare_clinical.R"), "Prepare clinical survival table",
-   file.path("R", "prepare_rppa.R"),     "Prepare RPPA proteomics data",
-   file.path("R", "prepare_rnaseq.R"),   "Prepare RNA-seq data",
-   file.path("R", "prepare_mutations.R"), "Prepare binary mutation features",
-   file.path("R", "integrate_data.R"),   "Integrate all data layers",
+   ~path,                                    ~step_name,
+   file.path("R", "setup.R"),                "Package setup and configuration",
+   file.path("R", "load_data.R"),            "Load raw cBioPortal data",
+   file.path("R", "prepare_clinical.R"),     "Prepare clinical survival table",
+   file.path("R", "prepare_rppa.R"),         "Prepare RPPA proteomics data",
+   file.path("R", "prepare_rnaseq.R"),       "Prepare RNA-seq data",
+   file.path("R", "prepare_mutations.R"),    "Prepare binary mutation features",
+   file.path("R", "integrate_data.R"),       "Integrate all data layers",
    file.path("R", "quick_survival_check.R"), "Quick survival check",
-   file.path("R", "feature_selection.R"), "Screen RPPA for features",
-   file.path("R", "pathway_scores.R"),   "Calculate pathway scores",
-   file.path("R", "survival_models.R"),  "Compare survival models",
-   file.path("R", "results_figures.R"),  "Create report-ready outputs"
+   file.path("R", "feature_selection.R"),    "Screen RPPA for features",
+   file.path("R", "pathway_scores.R"),       "Calculate pathway scores",
+   file.path("R", "survival_models.R"),      "Compare survival models",
+   file.path("R", "results_figures.R"),      "Create report-ready outputs"
 )
 
 # Pipeline script existence check ----------------------------------------------

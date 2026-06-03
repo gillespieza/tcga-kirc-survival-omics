@@ -1,5 +1,5 @@
 ============================================================
-Pipeline run started: 2026-06-03 15:14:33.343673
+Pipeline run started: 2026-06-03 15:26:26.640546
 ============================================================
 ------------------------------------------------------------
 Step: Package setup and configuration
@@ -33,7 +33,7 @@ Script: R/load_data.R
 [MESSAGE] 
 All data files loaded successfully.
 
-Completed Load raw cBioPortal data in 10.7 s.
+Completed Load raw cBioPortal data in 10 s.
 ------------------------------------------------------------
 Step: Prepare clinical survival table
 Script: R/prepare_clinical.R
@@ -44,7 +44,7 @@ Script: R/prepare_clinical.R
 
 [MESSAGE] Clinical survival table prepared.
 
-Completed Prepare clinical survival table in 0.6 s.
+Completed Prepare clinical survival table in 0.1 s.
 ------------------------------------------------------------
 Step: Prepare RPPA proteomics data
 Script: R/prepare_rppa.R
@@ -53,7 +53,7 @@ Script: R/prepare_rppa.R
 
 [MESSAGE] RPPA proteomics table prepared: 455 samples x 198 features. 3.5% missing values.
 
-Completed Prepare RPPA proteomics data in 3.2 s.
+Completed Prepare RPPA proteomics data in 5.3 s.
 ------------------------------------------------------------
 Step: Prepare RNA-seq data
 Script: R/prepare_rnaseq.R
@@ -95,7 +95,7 @@ Genes available per query (after QC):
 [MESSAGE] 
 Total genes retained: 3923
 
-Completed Prepare RNA-seq data in 29.6 s.
+Completed Prepare RNA-seq data in 28.1 s.
 ------------------------------------------------------------
 Step: Prepare binary mutation features
 Script: R/prepare_mutations.R
@@ -104,7 +104,7 @@ Script: R/prepare_mutations.R
 
 [MESSAGE] Mutation feature table prepared: 275 samples x 9 driver gene features.
 
-Completed Prepare binary mutation features in 0.1 s.
+Completed Prepare binary mutation features in 0.2 s.
 ------------------------------------------------------------
 Step: Integrate all data layers
 Script: R/integrate_data.R
@@ -121,7 +121,7 @@ Script: R/integrate_data.R
 
 [MESSAGE] Integration complete. 454 samples ready for modelling. 204 sample(s) are wild-type for all selected driver genes.
 
-Completed Integrate all data layers in 0.8 s.
+Completed Integrate all data layers in 1.2 s.
 ------------------------------------------------------------
 Step: Quick survival check
 Script: R/quick_survival_check.R
@@ -148,7 +148,7 @@ Script: R/quick_survival_check.R
 [36m•[38;5;232m [32mcolour[38;5;232m : [34m"Stage"[38;5;232m[39m
 [MESSAGE] Saved stage-stratified KM plot to figures/stage_kaplan_meier.png
 
-Completed Quick survival check in 5.6 s.
+Completed Quick survival check in 4.6 s.
 ------------------------------------------------------------
 Step: Screen RPPA for features
 Script: R/feature_selection.R
