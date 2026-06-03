@@ -32,8 +32,9 @@
 # clinical_survival_summary - Single-row tibble of patient/event counts and
 #                             median follow-up duration.
 #
-# Note: this script is intended to be sourced by run_analysis.R as part of
-#       the full pipeline, not run directly.
+# Usage: this script is intended to be sourced by run_analysis.R as part of
+#        the full pipeline, not run directly.
+
 
 # Validate join keys -----------------------------------------------------------
 # Only the join keys are checked here. All other required columns are validated

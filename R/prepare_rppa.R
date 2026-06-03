@@ -22,7 +22,8 @@
 #      underscores and strip trailing underscores.
 #   5. Pivot back to wide format (one row per sample).
 #
-# Usage: source("03_prepare_rppa.R")
+# Usage: this script is intended to be sourced by run_analysis.R as part of
+#        the full pipeline, not run directly.
 
 # Validate input --------------------------------------------------------------
 

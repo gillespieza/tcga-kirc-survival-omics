@@ -14,7 +14,8 @@
 #   results/rnaseq_selected_genes.csv
 #   rnaseq_expression (in memory)
 #
-# Note: this script is intended to be sourced by run_analysis.R.
+# Usage: this script is intended to be sourced by run_analysis.R as part of
+#        the full pipeline, not run directly.
 
 # Validate inputs -------------------------------------------------------------
 abort_if_false <- function(condition, message_text) {

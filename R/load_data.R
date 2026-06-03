@@ -36,7 +36,12 @@ required_path_objects <- c(
 )
 
 missing_path_objects <- required_path_objects[
-   !vapply(required_path_objects, exists, logical(1), inherits = TRUE)
+   !vapply(
+      required_path_objects, 
+      exists, 
+      logical(1), 
+      inherits = TRUE
+   )
 ]
 
 if (length(missing_path_objects) > 0) {
