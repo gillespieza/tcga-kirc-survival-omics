@@ -1,0 +1,155 @@
+============================================================
+Pipeline run started: 2026-06-03 15:14:33.343673
+============================================================
+------------------------------------------------------------
+Step: Package setup and configuration
+Script: R/setup.R
+------------------------------------------------------------
+[MESSAGE] Packages loaded successfully.
+
+[MESSAGE] All data files found.
+
+[MESSAGE] Package setup complete.
+
+[MESSAGE] Working study ID: kirc_tcga_pan_can_atlas_2018
+
+Completed Package setup and configuration in 0 s.
+------------------------------------------------------------
+Step: Load raw cBioPortal data
+Script: R/load_data.R
+------------------------------------------------------------
+[MESSAGE] Loaded clinical_patient (patient-level clinical data): 512 rows x 38 cols
+
+[MESSAGE] Loaded clinical_sample (sample-level clinical data): 512 rows x 19 cols
+
+[MESSAGE] Loaded mutation_data (somatic mutation calls): 29473 rows x 114 cols
+
+[MESSAGE] Loaded cna_data (copy-number alteration matrix): 25128 rows x 511 cols
+
+[MESSAGE] Loaded rppa_data (RPPA protein expression z-scores): 198 rows x 456 cols
+
+[MESSAGE] Loaded rnaseq_data (RNA-seq expression matrix): 20531 rows x 512 cols
+
+[MESSAGE] 
+All data files loaded successfully.
+
+Completed Load raw cBioPortal data in 10.7 s.
+------------------------------------------------------------
+Step: Prepare clinical survival table
+Script: R/prepare_clinical.R
+------------------------------------------------------------
+[MESSAGE] Joined clinical tables: 512 rows x 56 cols.
+
+[MESSAGE] Removed 0 record(s) with missing os_months or os_event.
+
+[MESSAGE] Clinical survival table prepared.
+
+Completed Prepare clinical survival table in 0.6 s.
+------------------------------------------------------------
+Step: Prepare RPPA proteomics data
+Script: R/prepare_rppa.R
+------------------------------------------------------------
+[MESSAGE] Input RPPA data: 198 features x 455 samples.
+
+[MESSAGE] RPPA proteomics table prepared: 455 samples x 198 features. 3.5% missing values.
+
+Completed Prepare RPPA proteomics data in 3.2 s.
+------------------------------------------------------------
+Step: Prepare RNA-seq data
+Script: R/prepare_rnaseq.R
+------------------------------------------------------------
+[MESSAGE] msigdbr version: 26.1.0
+
+[MESSAGE] Input RNA-seq data: 20531 genes x 511 samples.
+
+[MESSAGE] 
+Fetching MSigDB gene sets ...
+
+[MESSAGE] [neutrophil_degranulation] 2 gene sets; 13 genes
+
+[MESSAGE] [neutrophil_activation] 4 gene sets; 58 genes
+
+[MESSAGE] [inflammatory_response] 40 gene sets; 2153 genes
+
+[MESSAGE] [hallmark_inflammation] 1 gene sets; 200 genes
+
+[MESSAGE] [ecm_remodelling] 64 gene sets; 2024 genes
+
+[MESSAGE] [metalloprotease_activity] 3 gene sets; 190 genes
+
+[MESSAGE] [kinase_activity] 6 gene sets; 163 genes
+
+[MESSAGE] [kinase_signalling] 2 gene sets; 721 genes
+
+[MESSAGE] Gene set universe: 4385 candidates; 3923 present in RNA-seq
+
+[MESSAGE] Genes after deduplication: 3923
+
+[MESSAGE] Excluded genes (QC): 0
+
+[MESSAGE] RNA-seq matrix: 511 samples x 3923 genes
+
+[MESSAGE] 
+Genes available per query (after QC):
+
+[MESSAGE] 
+Total genes retained: 3923
+
+Completed Prepare RNA-seq data in 29.6 s.
+------------------------------------------------------------
+Step: Prepare binary mutation features
+Script: R/prepare_mutations.R
+------------------------------------------------------------
+[MESSAGE] Input mutation data: 29473 rows x 114 cols.
+
+[MESSAGE] Mutation feature table prepared: 275 samples x 9 driver gene features.
+
+Completed Prepare binary mutation features in 0.1 s.
+------------------------------------------------------------
+Step: Integrate all data layers
+Script: R/integrate_data.R
+------------------------------------------------------------
+[MESSAGE] 57 sample(s) in clinical_survival had no matching RPPA data and were dropped by the inner join.
+
+[MESSAGE] Clinical + RPPA: 455 rows x 206 cols.
+
+[MESSAGE] 1 sample(s) dropped due to missing RNA-seq overlap.
+
+[MESSAGE] After RNA integration: 454 samples | 4129 features
+
+[MESSAGE] Clinical + RPPA + mutation: 454 rows x 4138 cols.
+
+[MESSAGE] Integration complete. 454 samples ready for modelling. 204 sample(s) are wild-type for all selected driver genes.
+
+Completed Integrate all data layers in 0.8 s.
+------------------------------------------------------------
+Step: Quick survival check
+Script: R/quick_survival_check.R
+------------------------------------------------------------
+[MESSAGE] Overall survival summary:
+
+[MESSAGE] 4 row(s) dropped for complete case Cox analysis.
+
+[WARNING] Quick survival check: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
+[MESSAGE] Clinical Cox C-index: 0.779
+
+[MESSAGE] Clinical Cox model complete cases: 450
+
+[MESSAGE] Clinical Cox results:
+
+[MESSAGE] Proportional hazards test (Schoenfeld residuals):
+
+[WARNING] Quick survival check: One or more covariates show evidence of non-proportional hazards. Consider time-varying coefficients or a stratified Cox model.
+[MESSAGE] [38;5;232mIgnoring unknown labels:
+[36m•[38;5;232m [32mcolour[38;5;232m : [34m"Strata"[38;5;232m[39m
+[MESSAGE] Saved overall KM plot to figures/overall_kaplan_meier.png
+
+[MESSAGE] [38;5;232mIgnoring unknown labels:
+[36m•[38;5;232m [32mcolour[38;5;232m : [34m"Stage"[38;5;232m[39m
+[MESSAGE] Saved stage-stratified KM plot to figures/stage_kaplan_meier.png
+
+Completed Quick survival check in 5.6 s.
+------------------------------------------------------------
+Step: Screen RPPA for features
+Script: R/feature_selection.R
+------------------------------------------------------------
