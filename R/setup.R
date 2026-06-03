@@ -24,6 +24,7 @@
 #   mutation_file         - Path to somatic mutation data
 #   cna_file              - Path to copy-number alteration data
 #   rppa_file             - Path to RPPA protein expression z-scores
+#   rnaseq_file           - Path to RNA-seq expression data
 #
 # Note: data files must be pre-downloaded from cBioPortal and placed in data/
 # so the analysis can be reproduced without a live API connection. A global
@@ -31,19 +32,32 @@
 # (e.g. glmnet cross-validation) across all downstream scripts.
 #
 # Source: https://www.cbioportal.org/study/summary?id=kirc_tcga_pan_can_atlas_2018
-# Usage:  source("00_setup.R")  # call before any other project script
+#
+# Usage: source("run_analysis.R") from the project root
+# This script is intended to be sourced by run_analysis.R, not run directly.
 
+# Project root check -----------------------------------------------------------
+# Confirm that the script is being run from the project root. This helps avoid
+# confusing path errors later when here::here() is used to build file paths.
 
-# R version guard -------------------------------------------------------------
+if (!dir.exists("R") || !dir.exists("data")) {
+   stop(
+      "Project directories 'R' and/or 'data' were not found.\n",
+      "Run run_analysis.R from the project root so setup.R can be sourced correctly.",
+      call. = FALSE
+   )
+}
 
-if (getRversion() < "4.1.0") stop("R >= 4.1.0 is required.")
+# R version guard --------------------------------------------------------------
+# Stop early if the installed R version is too old for this project.
 
+if (getRversion() < "4.1.0") {
+   stop("R >= 4.1.0 is required.", call. = FALSE)
+}
 
-# Package setup ---------------------------------------------------------------
-# CRAN packages used for data handling, plotting, and survival analysis.
-# All packages are explicitly loaded below, including those that are also
-# required as dependencies (ggpubr, car, markdown), so that missing or
-# broken installations surface with a clear error at startup.
+# Package setup ----------------------------------------------------------------
+# Define the CRAN packages used across the project. Missing packages are
+# installed automatically so the pipeline is easier to run while learning.
 
 cran_packages <- c(
    "here",      # Reliable project-relative file paths
@@ -59,26 +73,36 @@ cran_packages <- c(
    "msigdbr"    # MSigDB gene sets for pathway analysis
 )
 
-for (pkg in cran_packages) {
-   if (!requireNamespace(pkg, quietly = TRUE)) {
-      install.packages(pkg, repos = "https://cloud.r-project.org")
+# Package installation helper --------------------------------------------------
+# Install any package that is not already available in the current R library.
+
+install_missing_packages <- function(packages) {
+   for (pkg in packages) {
+      if (!requireNamespace(pkg, quietly = TRUE)) {
+         install.packages(
+            pkg,
+            repos = "https://cloud.r-project.org"
+         )
+      }
    }
 }
 
-library(here)
-library(tidyverse)
-library(ggpubr)
-library(car)
-library(markdown)
-library(survival)
-library(survminer)
-library(glmnet)
-library(broom)
-library(msigdbr)
-# library(ellmer)
+# Package loading helper -------------------------------------------------------
+# Load each required package so downstream scripts can use them.
+
+load_required_packages <- function(packages) {
+   for (pkg in packages) {
+      library(
+         pkg,
+         character.only = TRUE
+      )
+   }
+}
+
+install_missing_packages(cran_packages)
+load_required_packages(cran_packages)
 
 message("Packages loaded successfully.")
-
 
 # Reproducibility -------------------------------------------------------------
 # Set a global seed to ensure stochastic steps (e.g. glmnet cross-validation)
@@ -92,10 +116,8 @@ set.seed(42)
 
 study_id <- "kirc_tcga_pan_can_atlas_2018"
 
-# These files were downloaded from cBioPortal and saved locally so that the
-# analysis can be rerun even if the cBioPortal API is unavailable.
-# here::here() ensures paths resolve correctly regardless of working directory.
-
+# Local data file paths --------------------------------------------------------
+# Build project-relative paths to the local cBioPortal data files.
 clinical_patient_file <- here::here("data", "data_clinical_patient.txt")
 clinical_sample_file  <- here::here("data", "data_clinical_sample.txt")
 mutation_file         <- here::here("data", "data_mutations.txt")
@@ -103,18 +125,24 @@ cna_file              <- here::here("data", "data_cna.txt")
 rppa_file             <- here::here("data", "data_rppa_zscores.txt")
 rnaseq_file           <- here::here("data", "data_mrna_seq_v2_rsem.txt")
 
+# Output directory setup -------------------------------------------------------
+# Create output folders early so downstream scripts can write results safely.
 
-# File existence check --------------------------------------------------------
-# Validate all data files are present before any downstream script attempts to
-# read them, so failures are caught early with an informative error message.
+if (!dir.exists("figures")) {
+   dir.create("figures", recursive = TRUE)
+}
+
+# File existence check ---------------------------------------------------------
+# Check that all required raw data files exist before any downstream script
+# tries to read them.
 
 data_files <- c(
    clinical_patient = clinical_patient_file,
-   clinical_sample  = clinical_sample_file,
-   mutation         = mutation_file,
-   cna              = cna_file,
-   rppa             = rppa_file,
-   rnaseq           = rnaseq_file
+   clinical_sample = clinical_sample_file,
+   mutation = mutation_file,
+   cna = cna_file,
+   rppa = rppa_file,
+   rnaseq = rnaseq_file
 )
 
 missing_files <- data_files[!file.exists(data_files)]
@@ -122,8 +150,12 @@ missing_files <- data_files[!file.exists(data_files)]
 if (length(missing_files) > 0) {
    stop(
       "The following data files were not found:\n",
-      paste0("  [", names(missing_files), "] ", missing_files, collapse = "\n"),
-      "\nDownload them from cBioPortal and place them in the data/ directory."
+      paste0(
+         "  - ", names(missing_files), ": ", missing_files,
+         collapse = "\n"
+      ),
+      "\nDownload them from cBioPortal and place them in the data/ directory.",
+      call. = FALSE
    )
 }
 
