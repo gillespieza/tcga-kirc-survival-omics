@@ -30,8 +30,6 @@ if (length(missing_objects) > 0) {
    )
 }
 
-if (!dir.exists("results")) dir.create("results", recursive = TRUE)
-
 clinical_model_terms <- c("age", "sex", "stage", "grade")
 
 # Ensure selected features are present in survival_data; warn if any are lost.

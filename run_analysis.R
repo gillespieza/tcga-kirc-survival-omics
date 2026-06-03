@@ -28,6 +28,9 @@ if (!dir.exists("R")) {
 if (!dir.exists("results")) {
    dir.create("results", recursive = TRUE)
 }
+if (!dir.exists("figures")) {
+   dir.create("figures", recursive = TRUE)
+}
 
 # Pipeline log file ------------------------------------------------------------
 # Save a plain-text log of the pipeline run in the results directory.
@@ -64,6 +67,7 @@ log_message <- function(...) {
 
 pipeline_steps <- tibble::tribble(
    ~path,                                    ~step_name,
+   file.path("R", "utils_validation.R"),     "Helper functions for validation errors",
    file.path("R", "setup.R"),                "Package setup and configuration",
    file.path("R", "load_data.R"),            "Load raw cBioPortal data",
    file.path("R", "prepare_clinical.R"),     "Prepare clinical survival table",

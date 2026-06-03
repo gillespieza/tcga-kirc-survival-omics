@@ -24,36 +24,14 @@
 # Usage: this script is intended to be sourced by run_analysis.R as part of
 #        the full pipeline, not run directly.
 
-# Small helper for consistent validation --------------------------------------
-
-abort_if_false <- function(condition, message_text) {
-   if (!condition) {
-      stop(message_text, call. = FALSE)
-   }
-}
 
 # Validate input --------------------------------------------------------------
 
-abort_if_false(
-   exists("mutation_data"),
-   "mutation_data is missing. Source load_data.R via run_analysis.R first."
-)
+check_required_objects("mutation_data")
 
-required_mutation_cols <- c(
-   "Tumor_Sample_Barcode", 
-   "Hugo_Symbol"
-)
-missing_mutation_cols  <- setdiff(
-   required_mutation_cols, 
-   names(mutation_data)
-)
-
-abort_if_false(
-   length(missing_mutation_cols) == 0,
-   paste(
-      "mutation_data is missing expected column(s):",
-      paste(missing_mutation_cols, collapse = ", ")
-   )
+check_has_columns(
+   "mutation_data",
+   c("Tumor_Sample_Barcode", "Hugo_Symbol")
 )
 
 abort_if_false(
@@ -66,6 +44,7 @@ message(
    nrow(mutation_data), " rows x ",
    ncol(mutation_data), " cols."
 )
+
 
 # Define driver genes ---------------------------------------------------------
 # Commonly altered ccRCC genes selected from known kidney cancer biology.

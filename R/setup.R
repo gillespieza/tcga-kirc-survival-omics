@@ -52,7 +52,10 @@ if (!dir.exists("R") || !dir.exists("data")) {
 # Stop early if the installed R version is too old for this project.
 
 if (getRversion() < "4.1.0") {
-   stop("R >= 4.1.0 is required.", call. = FALSE)
+   stop(
+      "R >= 4.1.0 is required.", 
+      call. = FALSE
+   )
 }
 
 # Package setup ----------------------------------------------------------------
@@ -69,7 +72,6 @@ cran_packages <- c(
    "survminer", # Kaplan-Meier plots and survival-curve visualisation
    "glmnet",    # Penalised regression, including LASSO Cox models
    "broom",     # Tidy model summaries for Cox model results
-   # "ellmer",    # LLM
    "msigdbr"    # MSigDB gene sets for pathway analysis
 )
 
@@ -124,13 +126,6 @@ mutation_file         <- here::here("data", "data_mutations.txt")
 cna_file              <- here::here("data", "data_cna.txt")
 rppa_file             <- here::here("data", "data_rppa_zscores.txt")
 rnaseq_file           <- here::here("data", "data_mrna_seq_v2_rsem.txt")
-
-# Output directory setup -------------------------------------------------------
-# Create output folders early so downstream scripts can write results safely.
-
-if (!dir.exists("figures")) {
-   dir.create("figures", recursive = TRUE)
-}
 
 # File existence check ---------------------------------------------------------
 # Check that all required raw data files exist before any downstream script

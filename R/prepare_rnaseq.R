@@ -18,27 +18,14 @@
 #        the full pipeline, not run directly.
 
 # Validate inputs -------------------------------------------------------------
-abort_if_false <- function(condition, message_text) {
-   if (!condition) {
-      stop(message_text, call. = FALSE)
-   }
-}
-abort_if_false(
-   exists("rnaseq_data"),
-   "rnaseq_data is missing. Source 01_load_data.R first."
-)
+check_required_objects("rnaseq_data")
+check_has_columns("rnaseq_data", "Hugo_Symbol")
 
-abort_if_false(
-   "Hugo_Symbol" %in% names(rnaseq_data),
-   "rnaseq_data is missing expected column: Hugo_Symbol"
-)
-
+# Validate msigdbr and version -------------------------------------------------
 abort_if_false(
    requireNamespace("msigdbr", quietly = TRUE),
    "Package \"msigdbr\" is required. Run install.packages(\"msigdbr\")."
 )
-
-# Validate msigdbr version -------------------------------------------------------------
 message("msigdbr version: ", as.character(utils::packageVersion("msigdbr")))
 
 n_genes_raw   <- nrow(rnaseq_data)
