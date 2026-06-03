@@ -6,6 +6,7 @@
 # for the study identifier and raw data file paths.
 #
 # Packages installed/loaded:
+#   here,     - Reliable project-relative file paths
 #   tidyverse - Data manipulation and visualisation (dplyr, ggplot2, stringr, etc.)
 #   ggpubr    - Publication-ready plot helpers (dependency of survminer)
 #   car       - Statistical utilities (dependency of ggpubr)
@@ -14,6 +15,7 @@
 #   survminer - Kaplan-Meier plots and survival-curve visualisation
 #   glmnet    - Penalised regression, including LASSO Cox models
 #   broom     - Tidy model summaries for Cox model results
+#   msigdbr   - MSigDB gene sets for pathway analysis
 #
 # Global constants defined:
 #   study_id              - cBioPortal study identifier
@@ -44,6 +46,7 @@ if (getRversion() < "4.1.0") stop("R >= 4.1.0 is required.")
 # broken installations surface with a clear error at startup.
 
 cran_packages <- c(
+   "here",      # Reliable project-relative file paths
    "tidyverse", # Data manipulation and visualisation
    "ggpubr",    # Publication-ready plot helpers (dependency of survminer)
    "car",       # Statistical utilities (dependency of ggpubr)
@@ -51,7 +54,9 @@ cran_packages <- c(
    "survival",  # Core survival-analysis models
    "survminer", # Kaplan-Meier plots and survival-curve visualisation
    "glmnet",    # Penalised regression, including LASSO Cox models
-   "broom"      # Tidy model summaries for Cox model results
+   "broom",     # Tidy model summaries for Cox model results
+   # "ellmer",    # LLM
+   "msigdbr"    # MSigDB gene sets for pathway analysis
 )
 
 for (pkg in cran_packages) {
@@ -60,6 +65,7 @@ for (pkg in cran_packages) {
    }
 }
 
+library(here)
 library(tidyverse)
 library(ggpubr)
 library(car)
@@ -68,6 +74,8 @@ library(survival)
 library(survminer)
 library(glmnet)
 library(broom)
+library(msigdbr)
+# library(ellmer)
 
 message("Packages loaded successfully.")
 
@@ -93,6 +101,7 @@ clinical_sample_file  <- here::here("data", "data_clinical_sample.txt")
 mutation_file         <- here::here("data", "data_mutations.txt")
 cna_file              <- here::here("data", "data_cna.txt")
 rppa_file             <- here::here("data", "data_rppa_zscores.txt")
+rnaseq_file           <- here::here("data", "data_mrna_seq_v2_rsem.txt")
 
 
 # File existence check --------------------------------------------------------
@@ -104,7 +113,8 @@ data_files <- c(
    clinical_sample  = clinical_sample_file,
    mutation         = mutation_file,
    cna              = cna_file,
-   rppa             = rppa_file
+   rppa             = rppa_file,
+   rnaseq           = rnaseq_file
 )
 
 missing_files <- data_files[!file.exists(data_files)]

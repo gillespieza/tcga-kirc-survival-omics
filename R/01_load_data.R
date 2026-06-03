@@ -78,4 +78,12 @@ stopifnot(
 message("Loaded rppa_data:         ", nrow(rppa_data), " rows x ",
         ncol(rppa_data), " cols")
 
-message("All data files loaded successfully.")
+# RNA-seq gene expression (RSEM, gene x sample matrix)
+rnaseq_data <- read_cbio(rnaseq_file)
+stopifnot(
+   "rnaseq_data must be non-empty"        = nrow(rnaseq_data) > 0,
+   "rnaseq_data must contain Hugo_Symbol" = "Hugo_Symbol" %in% names(rnaseq_data)
+)
+message("Loaded rnaseq_data:       ", nrow(rnaseq_data), " rows x ", ncol(rnaseq_data), " cols")
+
+message("\nAll data files loaded successfully.")

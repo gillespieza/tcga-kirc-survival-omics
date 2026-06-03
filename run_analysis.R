@@ -11,6 +11,7 @@
 #   01_load_data.R            - Load raw cBioPortal data files
 #   02_prepare_clinical.R     - Build clinical survival table
 #   03_prepare_rppa.R         - Reshape and clean RPPA data
+#   03b_prepare_rnaseq.R       
 #   04_prepare_mutations.R    - Build binary mutation feature table
 #   05_integrate_data.R       - Integrate all data layers
 #   06_quick_survival_check.R - Overall KM and clinical Cox checks
@@ -86,10 +87,12 @@ source_step("R/00_setup.R",                "Package setup and configuration")
 source_step("R/01_load_data.R",            "Load raw cBioPortal data")
 source_step("R/02_prepare_clinical.R",     "Prepare clinical survival table")
 source_step("R/03_prepare_rppa.R",         "Prepare RPPA proteomics data")
+source_step("R/03b_prepare_rnaseq.R",      "Prepare RNA seq data")
 source_step("R/04_prepare_mutations.R",    "Prepare binary mutation features")
 source_step("R/05_integrate_data.R",       "Integrate all data layers")
 source_step("R/06_quick_survival_check.R", "Quick survival check")
 source_step("R/07_feature_selection.R",    "Screen RPPA for features")
+source_step("R/07b_pathway_scores.R",      "Pathway Scores")
 source_step("R/08_survival_models.R",      "Compare survival models")
 source_step("R/09_results_figures.R",      "Create report-ready outputs")
 

@@ -29,7 +29,12 @@
 
 # Validate inputs -------------------------------------------------------------
 
-required_tables <- c("clinical_survival", "rppa_proteomics", "mutation_features")
+required_tables <- c(
+   "clinical_survival",
+   "rppa_proteomics",
+   "mutation_features",
+   "rnaseq_expression"
+)
 missing_tables  <- required_tables[!sapply(required_tables, exists)]
 
 if (length(missing_tables) > 0) {
@@ -42,21 +47,29 @@ if (length(missing_tables) > 0) {
 
 if (!"sample_id" %in% names(clinical_survival)) {
    stop("clinical_survival is missing required join key: sample_id")
-}
+} 
+
 if (!"sample_id" %in% names(rppa_proteomics)) {
    stop("rppa_proteomics is missing required join key: sample_id")
-}
+} 
+
 if (!"sample_id" %in% names(mutation_features)) {
    stop("mutation_features is missing required join key: sample_id")
 }
 
+if (!"sample_id" %in% names(rnaseq_expression)) {
+   stop("rnaseq_expression is missing required join key: sample_id")
+}
 
 # Integrate clinical and RPPA proteomics data ---------------------------------
 # Inner join retains only samples present in both tables. Samples in
 # clinical_survival with no RPPA data (and vice versa) are dropped.
 
+common_samples_1 <- intersect(clinical_survival$sample_id, rppa_proteomics$sample_id)
+
 clinical_rppa <- clinical_survival %>%
-   inner_join(rppa_proteomics, by = "sample_id")
+   dplyr::inner_join(rppa_proteomics, by = "sample_id") %>%
+   dplyr::filter(sample_id %in% common_samples_1)
 
 n_dropped_rppa <- nrow(clinical_survival) - nrow(clinical_rppa)
 if (n_dropped_rppa > 0) {
@@ -70,27 +83,57 @@ message("Clinical + RPPA: ", nrow(clinical_rppa), " rows x ",
         ncol(clinical_rppa), " cols.")
 
 
-# Integrate mutation features -------------------------------------------------
-# Left join retains all rows from clinical_rppa. Samples absent from
-# mutation_features had no observed mutation in any selected driver gene
-# and are valid wild-type samples; their mutation columns are set to 0.
 
-clinical_rppa_mutation <- clinical_rppa %>%
-   left_join(mutation_features, by = "sample_id") %>%
-   mutate(
-      across(
-         starts_with("mut_"),
-         ~ replace_na(.x, 0L)
+
+# Integrate RNA-seq -------------------------------------------------------
+# RNA-seq is high-dimensional and often has missing samples relative to
+# clinical/RPPA. We restrict to shared sample space for modelling consistency.
+
+common_samples_2 <- intersect(clinical_rppa$sample_id, rnaseq_expression$sample_id)
+
+clinical_rppa_rna <- clinical_rppa %>%
+   dplyr::inner_join(rnaseq_expression, by = "sample_id") %>%
+   dplyr::filter(sample_id %in% common_samples_2)
+
+n_dropped_rna <- nrow(clinical_rppa) - nrow(clinical_rppa_rna)
+
+if (n_dropped_rna > 0) {
+   message(
+      n_dropped_rna,
+      " sample(s) dropped due to missing RNA-seq overlap."
+   )
+}
+
+message(
+   "After RNA integration: ",
+   nrow(clinical_rppa_rna),
+   " samples | ",
+   ncol(clinical_rppa_rna),
+   " features"
+)
+
+# Integrate mutation features -------------------------------------------------
+# Left join retains all samples with full omics profile.
+# Missing mutation values = wild-type (0)
+
+clinical_rppa_mutation <- clinical_rppa_rna %>%
+   dplyr::left_join(mutation_features, by = "sample_id") %>%
+   dplyr::mutate(
+      dplyr::across(
+         dplyr::starts_with("mut_"),
+         ~ tidyr::replace_na(.x, 0L)
       )
    )
 
+
+# Check for duplication issues in mutation table.
 # The left join should never change the row count. Warn if it does, since
 # this would indicate duplicate sample IDs in mutation_features.
-if (nrow(clinical_rppa_mutation) != nrow(clinical_rppa)) {
+if (nrow(clinical_rppa_mutation) != nrow(clinical_rppa_rna)) {
    warning(
-      "Row count changed after mutation left join: ",
-      nrow(clinical_rppa), " -> ", nrow(clinical_rppa_mutation), " rows. ",
-      "mutation_features may contain duplicate sample IDs."
+      "Row count changed after mutation join: ",
+      nrow(clinical_rppa_rna), " -> ", nrow(clinical_rppa_mutation),
+      ". Check mutation_features duplicates."
    )
 }
 

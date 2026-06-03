@@ -1,4 +1,4 @@
-﻿# Integrating Clinical, Proteomic, and Mutation Data for Survival Analysis in TCGA KIRC
+# Integrating Clinical, Proteomic, and Mutation Data for Survival Analysis in TCGA KIRC
 
 ## Background
 
