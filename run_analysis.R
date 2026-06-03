@@ -118,8 +118,6 @@ source_step <- function(path, step_name) {
                "Error: ", conditionMessage(e)
             )
             
-            cat(error_message, "\n")
-            
             write(
                x = error_message,
                file = log_file_path,
