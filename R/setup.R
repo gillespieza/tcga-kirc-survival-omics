@@ -1,8 +1,8 @@
 # Project package setup and configuration -------------------------------------
 #
-# Bootstraps the R environment for this TCGA KIRC survival analysis mini ML 
-# project. Checks for and installs any missing CRAN packages, loads the core 
-# libraries required by downstream scripts, and declares project-level constants 
+# Bootstraps the R environment for this TCGA KIRC survival analysis mini ML
+# project. Checks for and installs any missing CRAN packages, loads the core
+# libraries required by downstream scripts, and declares project-level constants
 # for the study identifier and raw data file paths.
 #
 # Packages installed/loaded:
@@ -103,6 +103,23 @@ load_required_packages <- function(packages) {
 
 install_missing_packages(cran_packages)
 load_required_packages(cran_packages)
+
+# Package version assertions --------------------------------------------------
+# Ensure package versions match the validated baseline analysis environment
+# to protect the pipeline against breaking API changes.
+
+current_msigdbr_version <- utils::packageVersion("msigdbr")
+
+# Stop execution if the version is older than what your analysis expects
+if (current_msigdbr_version < "7.5.1") {
+  stop(
+    "msigdbr >= 7.5.1 is required for gene set compatibility.\n",
+    "Currently installed: ", current_msigdbr_version,
+    call. = FALSE
+  )
+}
+
+message("msigdbr version verified: ", as.character(current_msigdbr_version))
 
 message("Packages loaded successfully.")
 

@@ -71,11 +71,10 @@ model_formulae <- purrr::map(
 
 all_modelling_vars <- c("os_months", "os_event", formula_specs$integrated)
 
-modelling_data <- survival_data |>
-  dplyr::select(dplyr::all_of(all_modelling_vars)) |>
-  tidyr::drop_na()
-
-n_dropped_cc <- nrow(survival_data) - nrow(modelling_data)
+modelling_data <- enforce_complete_cases(
+   data      = survival_data,
+   variables = all_modelling_vars
+)
 
 if (n_dropped_cc > 0) {
   message(

@@ -148,13 +148,7 @@ readr::write_csv(
 
 # Coverage visualisation ------------------------------------------------------
 
-grDevices::png(
-  filename = "figures/pathway_coverage.png",
-  width    = 800,
-  height   = 500
-)
-
-coverage_df |>
+coverage_plot <- coverage_df |>
   dplyr::mutate(
     pathway = factor(.data$pathway, levels = .data$pathway)
   ) |>
@@ -175,7 +169,12 @@ coverage_df |>
     y     = "% genes present"
   )
 
-grDevices::dev.off()
+save_pipeline_plot(
+  plot_object = coverage_plot,
+  file_path   = "figures/pathway_coverage.png",
+  width       = 800,
+  height      = 500
+)
 
 # Merge pathway scores into survival_data -------------------------------------
 
@@ -249,13 +248,7 @@ readr::write_csv(
 
 # Correlation plot ------------------------------------------------------------
 
-grDevices::png(
-  filename = "figures/rna_rppa_correlations.png",
-  width    = 900,
-  height   = 600
-)
-
-correlation_df |>
+correlation_plot <- correlation_df |>
   ggplot2::ggplot(
     ggplot2::aes(
       x = stats::reorder(.data$rppa_feature, .data$spearman_r),
@@ -275,7 +268,12 @@ correlation_df |>
     y     = "Spearman correlation"
   )
 
-grDevices::dev.off()
+save_pipeline_plot(
+  plot_object = correlation_plot,
+  file_path   = "figures/rna_rppa_correlations.png",
+  width       = 900,
+  height      = 600
+)
 
 # Collinearity check ----------------------------------------------------------
 

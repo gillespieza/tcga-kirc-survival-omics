@@ -1,5 +1,5 @@
 ============================================================
-Pipeline run started: 2026-06-04 14:46:47.001093
+Pipeline run started: 2026-06-04 18:10:33.520677
 ============================================================
 ------------------------------------------------------------
 Step: Validation error helper functions
@@ -10,6 +10,8 @@ Completed Validation error helper functions in 0 ms.
 Step: Package setup and configuration
 Script: R/setup.R
 ------------------------------------------------------------
+[MESSAGE] msigdbr version verified: 26.1.0
+
 [MESSAGE] Packages loaded successfully.
 
 [MESSAGE] All data files found.
@@ -37,7 +39,7 @@ Script: R/load_data.R
 
 [MESSAGE] All data files loaded successfully.
 
-Completed Load raw cBioPortal data in 10.8 s.
+Completed Load raw cBioPortal data in 10.59 s.
 ------------------------------------------------------------
 Step: Prepare clinical survival table
 Script: R/prepare_clinical.R
@@ -57,13 +59,11 @@ Script: R/prepare_rppa.R
 
 [MESSAGE] RPPA proteomics table prepared: 455 samples x 198 features. 3.5% missing values.
 
-Completed Prepare RPPA proteomics data in 2.85 s.
+Completed Prepare RPPA proteomics data in 2.98 s.
 ------------------------------------------------------------
 Step: Prepare RNA-seq data
 Script: R/prepare_rnaseq.R
 ------------------------------------------------------------
-[MESSAGE] msigdbr version: 26.1.0
-
 [MESSAGE] Input RNA-seq data: 20531 genes x 511 samples.
 
 [MESSAGE] Fetching MSigDB gene sets ...
@@ -96,7 +96,7 @@ Script: R/prepare_rnaseq.R
 
 [MESSAGE] Total genes retained: 3923
 
-Completed Prepare RNA-seq data in 27.2 s.
+Completed Prepare RNA-seq data in 27.25 s.
 ------------------------------------------------------------
 Step: Prepare binary mutation features
 Script: R/prepare_mutations.R
@@ -105,31 +105,34 @@ Script: R/prepare_mutations.R
 
 [MESSAGE] Mutation feature table prepared: 275 samples x 9 driver gene features.
 
-Completed Prepare binary mutation features in 340 ms.
+Completed Prepare binary mutation features in 100 ms.
+------------------------------------------------------------
+Step: Prepare binary CNA features
+Script: R/prepare_cna.R
+------------------------------------------------------------
+[MESSAGE] Input CNA data: 25128 genes x 510 samples.
+
+[MESSAGE] CNA feature table prepared: 509 samples x 4 features passed screening.
+
+Completed Prepare binary CNA features in 480 ms.
 ------------------------------------------------------------
 Step: Integrate all data layers
 Script: R/integrate_data.R
 ------------------------------------------------------------
-[MESSAGE] 57 sample(s) in clinical_survival had no matching RPPA data and were dropped by the inner join.
-
-[MESSAGE] Clinical + RPPA: 455 samples x 206 features.
-
 [MESSAGE] 1 sample(s) with clinical + RPPA data had no matching RNA-seq and were dropped by the RNA-seq inner join.
 
 [MESSAGE] Clinical + RPPA + RNA-seq: 454 samples x 4129 features.
 
-[MESSAGE] Clinical + RPPA + RNA-seq + mutation: 454 samples x 4138 features.
+[MESSAGE] Integration complete. 454 samples fully combined into multi-omics workspace.
 
-[MESSAGE] Integration complete. 454 samples ready for modelling. 204 sample(s) are wild-type for all selected driver genes.
-
-Completed Integrate all data layers in 610 ms.
+Completed Integrate all data layers in 700 ms.
 ------------------------------------------------------------
 Step: Quick survival check
 Script: R/quick_survival_check.R
 ------------------------------------------------------------
 [MESSAGE] Overall survival summary:
 
-[MESSAGE] 4 row(s) dropped for complete case Cox analysis.
+[MESSAGE] 4 sample(s) dropped to establish a unified complete-case dataset.
 
 [WARNING] Quick survival check: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
 [MESSAGE] Clinical Cox C-index: 0.779
@@ -143,22 +146,26 @@ Script: R/quick_survival_check.R
 [WARNING] Quick survival check: One or more covariates show evidence of non-proportional hazards. Consider time-varying coefficients or a stratified Cox model.
 [MESSAGE] [38;5;232mIgnoring unknown labels:
 [36m•[38;5;232m [32mcolour[38;5;232m : [34m"Strata"[38;5;232m[39m
+[MESSAGE] [38;5;232mIgnoring unknown labels:
+[36m•[38;5;232m [32mcolour[38;5;232m : [34m"Strata"[38;5;232m[39m
 [MESSAGE] Saved overall KM plot to figures/overall_kaplan_meier.png
 
 [MESSAGE] [38;5;232mIgnoring unknown labels:
 [36m•[38;5;232m [32mcolour[38;5;232m : [34m"Stage"[38;5;232m[39m
+[MESSAGE] [38;5;232mIgnoring unknown labels:
+[36m•[38;5;232m [32mcolour[38;5;232m : [34m"Stage"[38;5;232m[39m
 [MESSAGE] Saved stage-stratified KM plot to figures/stage_kaplan_meier.png
 
-Completed Quick survival check in 5.2 s.
+Completed Quick survival check in 8.67 s.
 ------------------------------------------------------------
 Step: Screen RPPA for features
 Script: R/feature_selection.R
 ------------------------------------------------------------
-[MESSAGE] RPPA feature selection complete: selected 10 of 191 usable RPPA features.
+[MESSAGE] RPPA feature selection complete: selected 10 of 195 usable RPPA features.
 
 [MESSAGE] Selected RPPA features:
 
-Completed Screen RPPA for features in 7.54 s.
+Completed Screen RPPA for features in 8.11 s.
 ------------------------------------------------------------
 Step: Calculate pathway scores
 Script: R/pathway_scores.R
@@ -171,14 +178,16 @@ Script: R/pathway_scores.R
 
 [MESSAGE] Pathway scores appended to survival_data.
 
-Completed Calculate pathway scores in 5.41 s.
+Completed Calculate pathway scores in 6.77 s.
 ------------------------------------------------------------
 Step: Compare survival models
 Script: R/survival_models.R
 ------------------------------------------------------------
+[MESSAGE] 143 sample(s) dropped to establish a unified complete-case dataset.
+
 [MESSAGE] 4 sample(s) dropped to establish a unified complete-case modelling set.
 
-[MESSAGE] unified complete-case analysis cohort: 450 samples, 157 events.
+[MESSAGE] unified complete-case analysis cohort: 311 samples, 87 events.
 
 [WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
 [WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
@@ -191,15 +200,12 @@ Model comparison summary (ordered by AIC):
 [MESSAGE] 
 Model comparison complete. Best performing model by AIC: [integrated]
 
-Completed Compare survival models in 430 ms.
+Completed Compare survival models in 800 ms.
 ------------------------------------------------------------
 Step: Create report-ready outputs
 Script: R/results_figures.R
 ------------------------------------------------------------
-[WARNING] Create report-ready outputs: [38;5;232m`geom_errorbarh()` was deprecated in ggplot2 4.0.0.
-[36mℹ[38;5;232m Please use the `orientation` argument of `geom_errorbar()` instead.
-[90mThis warning is displayed once per session.[38;5;232m
-[90mCall ]8;;ide:run:lifecycle::last_lifecycle_warnings()lifecycle::last_lifecycle_warnings()]8;; to see where this warning was generated.[38;5;232m[39m
+[MESSAGE] [38;5;232m`height` was translated to `width`.[39m
 [MESSAGE] [38;5;232m`height` was translated to `width`.[39m
 [MESSAGE] Final performance visualization saved successfully.
 
@@ -207,8 +213,8 @@ Script: R/results_figures.R
 
 [MESSAGE] Pipeline figure output complete.
 
-Completed Create report-ready outputs in 990 ms.
+Completed Create report-ready outputs in 1.2 s.
 ============================================================
-Pipeline complete. Total time: 62.36 s.
+Pipeline complete. Total time: 68.29 s.
 ============================================================
 Session info written to results/session_info.txt

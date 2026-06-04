@@ -170,24 +170,9 @@ abort_if_false(
 
 
 # Summarise mutation frequencies ----------------------------------------------
+# Mutation counts are reported using the shared helper from utils_validation.R.
 
-mutation_summary <- mutation_features |>
-  dplyr::summarise(
-    dplyr::across(
-      dplyr::starts_with("mut_"),
-      sum
-    )
-  ) |>
-  tidyr::pivot_longer(
-    cols      = dplyr::everything(),
-    names_to  = "gene",
-    values_to = "n_mutated"
-  ) |>
-  dplyr::mutate(
-    gene        = stringr::str_remove(.data$gene, "^mut_"),
-    pct_mutated = round(100 * .data$n_mutated / nrow(mutation_features), 1)
-  ) |>
-  dplyr::arrange(dplyr::desc(.data$n_mutated))
+mutation_summary <- summarise_mutations(mutation_features)
 
 message(
   "Mutation feature table prepared: ",

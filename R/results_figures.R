@@ -102,16 +102,13 @@ c_index_comparison_plot <- ggplot2::ggplot(
 
 # Save visualization to disk --------------------------------------------------
 
-grDevices::png(
-  filename = "figures/model_c_index_comparison.png",
-  width    = 1600,
-  height   = 1000,
-  res      = 200
+save_pipeline_plot(
+   plot_object = c_index_comparison_plot,
+   file_path   = "figures/model_c_index_comparison.png",
+   width       = 1600,
+   height      = 1000,
+   resolution  = 200
 )
-
-print(c_index_comparison_plot)
-
-grDevices::dev.off()
 
 # Final pipeline diagnostics --------------------------------------------------
 

@@ -7,7 +7,6 @@
 #
 # Requires: load_data.R to have been sourced so that rnaseq_data is available in
 #           the global environment.
-#           Package msigdbr must be installed.
 #
 # Outputs:
 #   results/rnaseq_gene_set_membership.csv
@@ -18,17 +17,13 @@
 #        the full pipeline, not run directly.
 
 # Validate inputs -------------------------------------------------------------
+
 check_required_objects("rnaseq_data")
+
 check_has_columns("rnaseq_data", "Hugo_Symbol")
 
-# Validate msigdbr and version -------------------------------------------------
-abort_if_false(
-  requireNamespace("msigdbr", quietly = TRUE),
-  "Package \"msigdbr\" is required. Run install.packages(\"msigdbr\")."
-)
-message("msigdbr version: ", as.character(utils::packageVersion("msigdbr")))
-
 n_genes_raw <- nrow(rnaseq_data)
+
 n_samples_raw <- ncol(rnaseq_data) - 1L
 
 message(
@@ -71,7 +66,10 @@ fetch_gene_set <- function(query_name, collection, pattern) {
     species = "Homo sapiens",
     collection = collection
   ) |>
-    dplyr::select(dplyr::all_of("gs_name"), dplyr::all_of("gene_symbol"))
+    dplyr::select(
+      dplyr::all_of("gs_name"),
+      dplyr::all_of("gene_symbol")
+    )
 
   if (nrow(msig_tbl) == 0) {
     stop(
@@ -149,6 +147,7 @@ rnaseq_gene_set_membership <- gene_set_long |>
 # Gene universe ---------------------------------------------------------------
 
 candidate_genes <- unique(gene_set_long$gene_symbol)
+
 genes_in_data <- intersect(candidate_genes, rnaseq_data$Hugo_Symbol)
 
 message(
@@ -187,6 +186,7 @@ rnaseq_long <- rnaseq_filtered |>
     rsem = tidyr::replace_na(.data$rsem, 0),
     log2_expr = log2(.data$rsem + 1)
   )
+
 # QC --------------------------------------------------------------------------
 
 gene_qc <- rnaseq_long |>

@@ -171,14 +171,14 @@ clinical_survival <- clinical_data |>
     sex = factor(.data$SEX),
     stage = factor(
       .data$AJCC_PATHOLOGIC_TUMOR_STAGE,
-      levels  = stage_levels,
-      ordered = TRUE
-    ),
+      levels  = stage_levels, # Enforces the natural order sequence
+      ordered = FALSE # Prevents polynomial contrasts in Cox models
+    ) |> droplevels(), # prevents missing/excluded categories (like GX)
     grade = factor(
       dplyr::if_else(.data$GRADE == "GX", NA_character_, .data$GRADE),
       levels = grade_levels,
-      ordered = TRUE
-    )
+      ordered = FALSE # Prevents polynomial contrasts in Cox models
+    ) |> droplevels() # prevents missing/excluded categories (like GX)
   ) |>
   dplyr::filter(
     !is.na(.data$os_months),

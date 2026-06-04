@@ -53,23 +53,12 @@ check_has_columns(
 )
 
 # Prepare survival analysis table ---------------------------------------------
+# Factor levels and baseline reference positions are preserved exactly as
+# configured during the clinical preparation script.
 
 survival_data <- clinical_rppa_rna_mutation |>
-  dplyr::filter(
-    !is.na(.data$os_months),
-    !is.na(.data$os_event)
-  ) |>
   dplyr::mutate(
-    os_event = as.integer(.data$os_event),
-    sex = droplevels(factor(.data$sex)),
-    stage = stats::relevel(
-      droplevels(factor(.data$stage, ordered = FALSE)),
-      ref = "STAGE I"
-    ),
-    grade = stats::relevel(
-      droplevels(factor(.data$grade, ordered = FALSE)),
-      ref = "G1"
-    )
+    os_event = as.integer(.data$os_event)
   )
 
 abort_if_false(
@@ -126,20 +115,12 @@ print(overall_survival_summary)
 # Use complete cases for the clinical covariates so coxph uses a transparent
 # and reproducible analysis set.
 
-clinical_model_data <- survival_data |>
-  dplyr::select(
-    dplyr::all_of(c("os_months", "os_event", "age", "sex", "stage", "grade"))
-  ) |>
-  tidyr::drop_na()
+clinical_vars <- c("os_months", "os_event", "age", "sex", "stage", "grade")
 
-n_dropped_cc <- nrow(survival_data) - nrow(clinical_model_data)
-
-if (n_dropped_cc > 0) {
-  message(
-    n_dropped_cc,
-    " row(s) dropped for complete case Cox analysis."
-  )
-}
+clinical_model_data <- enforce_complete_cases(
+  data      = survival_data,
+  variables = clinical_vars
+)
 
 if (nrow(clinical_model_data) < 20) {
   warning(
@@ -219,14 +200,13 @@ overall_km_plot <- survminer::ggsurvplot(
   title      = "TCGA KIRC: overall survival"
 )
 
-grDevices::png(
-  filename = "figures/overall_kaplan_meier.png",
-  width    = 1800,
-  height   = 1600,
-  res      = 220
+save_pipeline_plot(
+  plot_object = overall_km_plot,
+  file_path   = "figures/overall_kaplan_meier.png",
+  width       = 1800,
+  height      = 1600,
+  resolution  = 220
 )
-print(overall_km_plot)
-grDevices::dev.off()
 
 message("Saved overall KM plot to figures/overall_kaplan_meier.png")
 
@@ -251,13 +231,12 @@ stage_km_plot <- survminer::ggsurvplot(
   title        = "TCGA KIRC: overall survival by AJCC stage"
 )
 
-grDevices::png(
-  filename = "figures/stage_kaplan_meier.png",
-  width    = 1800,
-  height   = 1800,
-  res      = 220
+save_pipeline_plot(
+  plot_object = stage_km_plot,
+  file_path   = "figures/stage_kaplan_meier.png",
+  width       = 1800,
+  height      = 1800,
+  resolution  = 220
 )
-print(stage_km_plot)
-grDevices::dev.off()
 
 message("Saved stage-stratified KM plot to figures/stage_kaplan_meier.png")
