@@ -78,7 +78,7 @@ format_elapsed_time <- function(time_seconds) {
 
 pipeline_steps <- tibble::tribble(
    ~path,                                    ~step_name,
-   file.path("R", "utils_validation.R"),     "Helper functions for validation errors",
+   file.path("R", "utils_validation.R"),     "Validation error helper functions",
    file.path("R", "setup.R"),                "Package setup and configuration",
    file.path("R", "load_data.R"),            "Load raw cBioPortal data",
    file.path("R", "prepare_clinical.R"),     "Prepare clinical survival table",
@@ -112,10 +112,20 @@ if (nrow(missing_scripts) > 0) {
 # the sourced script, and stop with a helpful error message if the step fails.
 
 source_step <- function(path, step_name) {
-   log_message(strrep("-", 60))
-   log_message("Step: ", step_name)
-   log_message("Script: ", path)
-   log_message(strrep("-", 60))
+   # Generate clean plain text strings for file logs
+   plain_header <- strrep("-", 60)
+   plain_step   <- paste0("Step: ", step_name)
+   plain_script <- paste0("Script: ", path)
+   
+   # Print structural pipeline frames in clean, solid black text
+   cli::cli_text(cli::col_black(plain_header))
+   cli::cli_text(cli::style_bold(cli::col_black(plain_step)))
+   cli::cli_text(cli::col_black(plain_script))
+   cli::cli_text(cli::col_black(plain_header))
+   
+   # Log unstyled strings to file
+   write(x = c(plain_header, plain_step, plain_script, plain_header),
+         file = log_file_path, append = TRUE)
    
    t_start <- proc.time()
    
@@ -139,12 +149,13 @@ source_step <- function(path, step_name) {
          }
       ),
       message = function(m) {
-         message_text <- paste0("[MESSAGE] ", conditionMessage(m))
+         message_text <- conditionMessage(m)
          
-         cat(message_text, "\n")
+         # Inject the text smoothly without nested brace confusion
+         cli::cli_text(paste0(cli::col_cyan("\u2139\ufe0f [MESSAGE] "), message_text))
          
          write(
-            x = message_text,
+            x = paste0("[MESSAGE] ", message_text),
             file = log_file_path,
             append = TRUE
          )
@@ -152,17 +163,12 @@ source_step <- function(path, step_name) {
          invokeRestart("muffleMessage")
       },
       warning = function(w) {
-         warning_text <- paste0(
-            "[WARNING] ",
-            step_name,
-            ": ",
-            conditionMessage(w)
-         )
+         warning_text <- conditionMessage(w)
          
-         cat(warning_text, "\n")
+         cli::cli_text(paste0(cli::col_yellow("\u26a0\ufe0f [WARNING] "), cli::col_yellow(step_name), ": ", warning_text))
          
          write(
-            x = warning_text,
+            x = paste0("[WARNING] ", step_name, ": ", warning_text),
             file = log_file_path,
             append = TRUE
          )
@@ -172,13 +178,18 @@ source_step <- function(path, step_name) {
    )
    
    elapsed <- unname((proc.time() - t_start)[["elapsed"]])
+   formatted_time <- format_elapsed_time(elapsed)
    
-   log_message(
-      "Completed ",
-      step_name,
-      " in ",
-      format_elapsed_time(elapsed),
-      "."
+   # Print the completion string cleanly
+   cli::cli_text(cli::col_green(paste0("\u2705 Completed ", 
+                                       step_name, 
+                                       " in ", 
+                                       formatted_time, ".")))
+   
+   write(
+      x = paste0("Completed ", step_name, " in ", formatted_time, "."),
+      file = log_file_path,
+      append = TRUE
    )
 }
 
@@ -195,22 +206,33 @@ for (i in seq_len(nrow(pipeline_steps))) {
 }
 
 total_elapsed <- unname((proc.time() - t_pipeline_start)[["elapsed"]])
+formatted_total_time <- format_elapsed_time(total_elapsed)
 
 # Save session information -----------------------------------------------------
 # Save R version, platform, and loaded package versions for reproducibility.
 
-session_info_path <- file.path("results", "session_info.txt")
+session_info_path = file.path("results", "session_info.txt")
 
 writeLines(
    text = capture.output(sessionInfo()),
    con = session_info_path
 )
 
-log_message(strrep("=", 60))
-log_message(
-   "Pipeline complete. Total time: ",
-   format_elapsed_time(total_elapsed),
-   "."
+# Print a striking final pipeline completion block
+cli::cli_text(cli::col_green(strrep("=", 60)))
+cli::cli_text(cli::style_bold(cli::col_green(
+   paste0("\ud83c\udf89 Pipeline complete. Total time: ",
+          formatted_total_time,
+          "."))))
+cli::cli_text(cli::col_green(strrep("=", 60)))
+cli::cli_text(cli::col_grey(paste0("Session info written to ", session_info_path)))
+write(
+   x = c(
+      strrep("=", 60),
+      paste0("Pipeline complete. Total time: ", formatted_total_time, "."),
+      strrep("=", 60),
+      paste0("Session info written to ", session_info_path)
+   ),
+   file = log_file_path,
+   append = TRUE
 )
-log_message(strrep("=", 60))
-log_message("Session info written to ", session_info_path)
