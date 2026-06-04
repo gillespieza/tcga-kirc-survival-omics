@@ -56,21 +56,18 @@ check_has_columns(
 
 survival_data <- clinical_rppa_rna_mutation |>
    dplyr::filter(
-      !is.na(.data$os_months),
-      !is.na(.data$os_event)
+      !is.na(os_months),
+      !is.na(os_event)
    ) |>
    dplyr::mutate(
-      os_event = as.integer(.data$os_event),
-      sex      = droplevels(factor(.data$sex)),
-      # Treat ordered clinical categories as reference-coded factors in Cox
-      # models. This gives interpretable contrasts such as STAGE IV vs STAGE I
-      # instead of polynomial terms like stage.L and stage.Q.
+      os_event = as.integer(os_event),
+      sex      = droplevels(factor(sex)),
       stage    = stats::relevel(
-         droplevels(factor(.data$stage, ordered = FALSE)),
+         droplevels(factor(stage, ordered = FALSE)),
          ref = "STAGE I"
       ),
       grade    = stats::relevel(
-         droplevels(factor(.data$grade, ordered = FALSE)),
+         droplevels(factor(grade, ordered = FALSE)),
          ref = "G1"
       )
    )
@@ -109,10 +106,10 @@ median_survival_months <- tryCatch(
 overall_survival_summary <- survival_data |>
    dplyr::summarise(
       samples                 = dplyr::n(),
-      patients                = dplyr::n_distinct(.data$patient_id),
-      events                  = sum(.data$os_event),
-      censored                = dplyr::n() - sum(.data$os_event),
-      median_follow_up_months = stats::median(.data$os_months, na.rm = TRUE),
+      patients                = dplyr::n_distinct(patient_id),
+      events                  = sum(os_event),
+      censored                = dplyr::n() - sum(os_event),
+      median_follow_up_months = stats::median(os_months, na.rm = TRUE),
       median_survival_months  = median_survival_months
    )
 
