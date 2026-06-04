@@ -1,12 +1,13 @@
 # RPPA feature selection -------------------------------------------------------
 #
-# Screens RPPA protein expression features with univariable Cox models and keeps
-# a compact, interpretable set of proteins for downstream survival modelling.
+# Screens RPPA protein expression features with univariable Cox models to support
+# pathway correlation analysis, then applies a multivariable LASSO Cox model on
+# a promising subset to isolate stable prognostic proteins for survival modelling.
 # Mutation features are carried forward from the curated ccRCC driver-gene set
 # prepared in prepare_mutations.R, after filtering for minimum prevalence.
 #
-# Requires: quick_survival_check.R to have been sourced so that survival_data is
-#           available in the global environment.
+# Requires: prepare_mutations.R and prepare_clinical.R to have been sourced,
+#           and survival_data to be available in the global environment.
 #
 # Produces:
 #   rppa_feature_cols          - Candidate RPPA feature column names.
@@ -19,9 +20,10 @@
 #   results/rppa_univariable_cox_results.csv
 #   results/selected_rppa_features.csv
 #   results/selected_mutation_features.csv
+#   results/rppa_lasso_coefficients.csv
 #
-# Note: this script is intended to be sourced by run_analysis.R as part of
-#       the full pipeline, not run directly.
+# Usage: this script is intended to be sourced by run_analysis.R as part of
+#        the full pipeline, not run directly.
 
 
 # Validate inputs -------------------------------------------------------------
@@ -29,101 +31,146 @@
 check_required_objects("survival_data")
 
 required_survival_cols <- c(
-  "patient_id",
-  "sample_id",
-  "os_months",
-  "os_event",
-  "age",
-  "sex",
-  "stage",
-  "grade"
+   "patient_id",
+   "sample_id",
+   "os_months",
+   "os_event",
+   "age",
+   "sex",
+   "stage",
+   "grade"
 )
 
 check_has_columns(
-  "survival_data",
-  required_survival_cols
+   "survival_data",
+   required_survival_cols
 )
 
 
 # Column classification --------------------------------------------------------
-# Identify clinical, mutation, RNA, & RPPA feature columns. Clinical, mutation,
-# and RNA columns are excluded from RPPA screening so this script focuses on
-# protein (RPPA) features.
+# Separate the individual feature blocks cleanly by parsing column name prefixes
 
 all_col_names <- names(survival_data)
 
 clinical_cols <- required_survival_cols
 
 mutation_feature_cols <- all_col_names[
-  stringr::str_starts(all_col_names, "mut_")
+   stringr::str_starts(all_col_names, "mut_")
 ]
 
 rna_feature_cols <- all_col_names[
-  stringr::str_starts(all_col_names, "rna_")
+   stringr::str_starts(all_col_names, "rna_")
 ]
 
 rppa_feature_cols <- setdiff(
-  all_col_names,
-  c(clinical_cols, mutation_feature_cols, rna_feature_cols)
+   all_col_names,
+   c(clinical_cols, mutation_feature_cols, rna_feature_cols)
 )
 
+
 # Filter RPPA candidates -------------------------------------------------------
-# Keep numeric RPPA columns with enough observed values and variation to support
-# a Cox model.
+# Retain numeric proteomic variables that carry adequate sample coverage
 
 rppa_feature_cols <- rppa_feature_cols[
-  vapply(
-    survival_data[rppa_feature_cols],
-    function(x) {
-      is.numeric(x) &&
-        sum(!is.na(x)) >= 30 &&
-        stats::sd(x, na.rm = TRUE) > 0
-    },
-    logical(1)
-  )
+   vapply(
+      survival_data[rppa_feature_cols],
+      function(x) {
+         is.numeric(x) &&
+            sum(!is.na(x)) >= 30 &&
+            stats::sd(x, na.rm = TRUE) > 0
+      },
+      logical(1)
+   )
 ]
 
 abort_if_false(
-  length(rppa_feature_cols) > 0,
-  "No usable numeric RPPA features were found for Cox screening."
+   length(rppa_feature_cols) > 0,
+   "No usable numeric RPPA features were found for Cox screening."
 )
 
-# Drop mutation features with prevalence below 5 % to avoid overfitting
-# downstream on nearly-absent alterations.
-
+# Drop rare somatic mutations with low prevalence (< 5%) to protect power
 mutation_feature_cols <- mutation_feature_cols[
-  vapply(
-    survival_data[mutation_feature_cols],
-    function(x) mean(x, na.rm = TRUE) >= 0.05,
-    logical(1)
-  )
+   vapply(
+      survival_data[mutation_feature_cols],
+      function(x) mean(x, na.rm = TRUE) >= 0.05,
+      logical(1)
+   )
 ]
 
 if (length(mutation_feature_cols) == 0) {
-  warning(
-    "No mutation feature columns passed the prevalence filter; ",
-    "mutation models will be skipped.",
-    call. = FALSE
-  )
+   warning(
+      "No mutation feature columns passed the prevalence filter; ",
+      "mutation models will be skipped.",
+      call. = FALSE
+   )
 }
 
-# Multivariable LASSO Feature Selection ---------------------------------------
-#
-# Instead of biased univariable screening, we use a multivariable LASSO Cox 
-# model with internal 10-fold cross-validation. Clinical variables are given 
-# a tiny penalty factor of 0.001 to act as a ridge stabilizer, preventing 
-# C++ convergence failures due to separation while ensuring they are never 
-# regularised out of the model space.
 
-# Prepare design matrix (X) and survival outcome (Y)
+# 1. Univariable Cox Screening Loop --------------------------------------------
+# Evaluates baseline prognostic value for each protein to support pathway scores
+
+message("Running univariable screening across all valid proteomic markers ...")
+
+rppa_results_list <- list()
+
+for (feat in rppa_feature_cols) {
+   # Build a narrow complete case subset for this single protein to maximise sample retention
+   df_temp <- survival_data |>
+      dplyr::select(dplyr::all_of(c("os_months", "os_event", feat))) |>
+      tidyr::drop_na()
+   
+   if (nrow(df_temp) >= 30) {
+      formula_uni <- stats::as.formula(paste("survival::Surv(os_months, os_event) ~", feat))
+      
+      fit_uni <- tryCatch(
+         survival::coxph(formula_uni, data = df_temp, ties = "efron"),
+         error = function(e) NULL
+      )
+      
+      if (!is.null(fit_uni)) {
+         summary_uni <- summary(fit_uni)
+         coef_info   <- summary_uni$coefficients
+         
+         rppa_results_list[[feat]] <- tibble::tibble(
+            feature    = feat,
+            log_hr     = coef_info[1, "coef"],
+            abs_log_hr = abs(coef_info[1, "coef"]),
+            p_value    = coef_info[1, "Pr(>|z|)"]
+         )
+      }
+   }
+}
+
+rppa_univariable_results <- dplyr::bind_rows(rppa_results_list) |>
+   dplyr::mutate(
+      p_adjust_bh = stats::p.adjust(.data$p_value, method = "BH")
+   ) |>
+   dplyr::arrange(.data$p_adjust_bh, dplyr::desc(.data$abs_log_hr))
+
+# Export the univariable reference matrix required by pathway_scores.R
+readr::write_csv(
+   rppa_univariable_results,
+   "results/rppa_univariable_cox_results.csv"
+)
+
+
+# 2. Multivariable LASSO Feature Selection ---------------------------------------
+# Restrict the model space to the top 30 univariable proteins to avoid a sample size crash
+
+top_uni_proteins <- rppa_univariable_results |>
+   dplyr::slice_head(n = 30L) |>
+   dplyr::pull(.data$feature)
+
 clinical_vars <- c("age", "sex", "stage", "grade")
-modelling_vars <- c(clinical_vars, rppa_feature_cols)
+modelling_vars <- c(clinical_vars, top_uni_proteins)
 
 lasso_data <- survival_data |>
    dplyr::select(dplyr::all_of(c("os_months", "os_event", modelling_vars))) |>
    tidyr::drop_na()
 
-# Create the numeric design matrix including dummy codes for clinical factors
+message("Number of complete cases for multivariable regularisation: ", nrow(lasso_data))
+
+# Construct design matrix including dummy expansion strings for factor variables
 x_matrix <- stats::model.matrix(
    stats::as.formula(paste("~", paste(modelling_vars, collapse = " + "))),
    data = lasso_data
@@ -131,20 +178,19 @@ x_matrix <- stats::model.matrix(
 
 x_names <- colnames(x_matrix)
 
-# Map which columns belong to the proteomic features vs clinical variables
-rppa_indices <- which(x_names %in% rppa_feature_cols)
-clinical_indices <- which(!x_names %in% rppa_feature_cols)
+# Map clinical vs proteomic column position indices
+clinical_indices <- which(!x_names %in% top_uni_proteins)
 
 y_surv <- survival::Surv(
    time  = lasso_data$os_months,
    event = lasso_data$os_event
 )
 
-# Set up penalty factors: 0.001 to stabilize baseline clinical features, 1 for proteins
+# Set penalty factors: 0.001 acts as a ridge stabiliser for clinical baseline indicators
 penalty_vector <- rep(1, ncol(x_matrix))
 penalty_vector[clinical_indices] <- 0.001
 
-message("Fitting cross-validated multivariable LASSO Cox model...")
+message("Fitting cross-validated multivariable LASSO Cox model ...")
 
 lasso_cv_fit <- glmnet::cv.glmnet(
    x              = x_matrix,
@@ -155,15 +201,12 @@ lasso_cv_fit <- glmnet::cv.glmnet(
    cox.ties       = "efron"
 )
 
-# Extract coefficients at the optimal lambda value 
-# 'lambda.1se' provides the most regularised, parsimonious model within 1 SE of the minimum
-lasso_coefs <- stats::coef(
-   lasso_cv_fit,
-   s = "lambda.1se"
-) |>
-   as.matrix()
 
-# Convert to a tidy data frame for filtering
+# 3. Tiered Feature Extraction & Fail-Safes ------------------------------------
+
+# Tier A: Attempt parsimonious extraction via standard lambda.1se
+lasso_coefs <- stats::coef(lasso_cv_fit, s = "lambda.1se") |> as.matrix()
+
 lasso_results_df <- tibble::tibble(
    feature     = rownames(lasso_coefs),
    coefficient = as.numeric(lasso_coefs)
@@ -174,34 +217,50 @@ lasso_results_df <- tibble::tibble(
    ) |>
    dplyr::arrange(dplyr::desc(abs(.data$coefficient)))
 
-# Extract the selected protein feature names for downstream scripts
-selected_rppa_features <- lasso_results_df |>
-   dplyr::pull(.data$feature)
+selected_rppa_features <- lasso_results_df |> dplyr::pull(.data$feature)
 
-# Cap the maximum number of features to safeguard against the EPV deficit
-n_selected_rppa <- length(selected_rppa_features)
-
-if (n_selected_rppa > 10) {
-   message("LASSO selected ", n_selected_rppa, " proteins. Capping at top 10 to protect model power.")
-   selected_rppa_features <- lasso_results_df |>
-      dplyr::slice_head(n = 10) |>
-      dplyr::pull(.data$feature)
-} else if (n_selected_rppa == 0) {
-   warning("LASSO shrunk all protein coefficients to zero. Reverting to minimum lambda target.")
+# Tier B Fallback: Revert to lambda.min if 1se is completely shrunk
+if (length(selected_rppa_features) == 0) {
+   message("LASSO shrunk all protein coefficients to zero at lambda.1se. Reverting to lambda.min ...")
    
-   lasso_coefs_min <- stats::coef(lasso_cv_fit, s = "lambda.min") |>
-      as.matrix()
+   lasso_coefs_min <- stats::coef(lasso_cv_fit, s = "lambda.min") |> as.matrix()
    
-   selected_rppa_features <- tibble::tibble(
-      feature = rownames(lasso_coefs_min),
+   lasso_results_df <- tibble::tibble(
+      feature     = rownames(lasso_coefs_min),
       coefficient = as.numeric(lasso_coefs_min)
    ) |>
       dplyr::filter(
          .data$coefficient != 0,
          !.data$feature %in% x_names[clinical_indices]
       ) |>
-      dplyr::slice_head(n = 5) |>
-      dplyr::pull(.data$feature)
+      dplyr::arrange(dplyr::desc(abs(.data$coefficient)))
+   
+   selected_rppa_features <- lasso_results_df |> dplyr::pull(.data$feature)
+}
+
+# Tier C Fallback: Revert to top 5 univariable features if clinical dominance is absolute
+if (length(selected_rppa_features) == 0) {
+   warning(
+      "LASSO shrunk all protein coefficients to zero at lambda.min due to clinical dominance. ",
+      "Falling back to the top 5 most robust univariable prognostic markers to guarantee pipeline continuity.",
+      call. = FALSE
+   )
+   
+   lasso_results_df <- rppa_univariable_results |>
+      dplyr::slice_head(n = 5L) |>
+      dplyr::transmute(
+         feature     = .data$feature,
+         coefficient = .data$log_hr
+      )
+   
+   selected_rppa_features <- lasso_results_df |> dplyr::pull(.data$feature)
+}
+
+# Apply an upper cap to eliminate selection bias and structural EPV deficits
+if (length(selected_rppa_features) > 10) {
+   message("Selection isolated more than 10 proteins. Capping at top 10 to protect model power.")
+   selected_rppa_features <- selected_rppa_features[1:10]
+   lasso_results_df       <- lasso_results_df |> dplyr::filter(.data$feature %in% selected_rppa_features)
 }
 
 selected_mutation_features <- mutation_feature_cols
@@ -209,7 +268,6 @@ selected_mutation_features <- mutation_feature_cols
 
 # Write outputs ---------------------------------------------------------------
 
-# Save the non-zero regularisation coefficients
 readr::write_csv(
    lasso_results_df,
    "results/rppa_lasso_coefficients.csv"
@@ -226,7 +284,7 @@ readr::write_csv(
 )
 
 message(
-   "RPPA feature selection complete: LASSO isolated ",
+   "RPPA feature selection complete: Isolated ",
    length(selected_rppa_features),
    " robust prognostic protein markers."
 )

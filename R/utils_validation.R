@@ -69,36 +69,36 @@ check_has_sample_id <- function(object_name, env = .GlobalEnv) {
 
 # Summarise Mutation Frequencies
 # Takes a data frame containing binary mutation columns prefixed with "mut_"
-# and returns a sorted, long-format summary table with sample percentages.
+# and returns a sorted, long-format summary table with sample percentages,
+# accounting for missing profiles via non-missing denoms.
 summarise_mutations <- function(data) {
-  summary_table <- data |>
-    # Sum up the binary indicators (1 = mutated, 0 = wild type) across columns
-    dplyr::summarise(
-      dplyr::across(
-        dplyr::starts_with("mut_", ignore.case = FALSE),
-        sum
+   summary_table <- data |>
+      # Isolate mutation columns cleanly
+      dplyr::select(dplyr::starts_with("mut_", ignore.case = FALSE)) |>
+      # Pivot into a long single vertical stream for uniform grouping
+      tidyr::pivot_longer(
+         cols      = dplyr::everything(),
+         names_to  = "gene",
+         values_to = "status"
+      ) |>
+      # Group by individual gene to calculate specific profile statistics
+      dplyr::group_by(.data$gene) |>
+      dplyr::summarise(
+         n_mutated   = sum(.data$status == 1L, na.rm = TRUE),
+         n_profiled  = sum(!is.na(.data$status)),
+         pct_mutated = round(100 * sum(.data$status == 1L, na.rm = TRUE) / sum(!is.na(.data$status)), 1),
+         .groups     = "drop"
+      ) |>
+      # Strip the prefix for clear report-ready tables
+      dplyr::mutate(
+         gene = stringr::str_remove(.data$gene, "^mut_")
+      ) |>
+      # Sort with the most frequently mutated driver genes at the top
+      dplyr::arrange(
+         dplyr::desc(.data$n_mutated)
       )
-    ) |>
-    # Pivot from a single wide row into a clean vertical list
-    tidyr::pivot_longer(
-      cols      = dplyr::everything(),
-      names_to  = "gene",
-      values_to = "n_mutated"
-    ) |>
-    # Clean up the gene names and compute the cohort percentage
-    dplyr::mutate(
-      gene = stringr::str_remove(.data$gene, "^mut_"),
-      pct_mutated = round(
-        100 * .data$n_mutated / nrow(data),
-        1
-      )
-    ) |>
-    # Sort with the most frequently mutated driver genes at the top
-    dplyr::arrange(
-      dplyr::desc(.data$n_mutated)
-    )
-
-  summary_table
+   
+   summary_table
 }
 
 # Enforce Complete Cases across Specific Variables
@@ -125,31 +125,38 @@ enforce_complete_cases <- function(data, variables) {
 
 
 # Standardised Graphics Export
-
 save_pipeline_plot <- function(plot_object, file_path, width, height, resolution = 72) {
-   # Open the PNG file device to capture the high-resolution plot on disk
-   grDevices::png(
-      filename = file_path,
-      width    = width,
-      height   = height,
-      res      = resolution
-   )
-   
-   # Print the plot directly into the active file device
-   print(plot_object)
-   
-   # Close the file device to finish writing and save the PNG file
-   grDevices::dev.off()
-   
-   # Print the plot a second time to send it to the RStudio Plots pane
-   print(plot_object)
+  # Open the PNG file device to capture the high-resolution plot on disk
+  grDevices::png(
+    filename = file_path,
+    width    = width,
+    height   = height,
+    res      = resolution
+  )
+
+  # Handle survminer object wrapper separation safely
+  if (inherits(plot_object, "ggsurvplot")) {
+    print(plot_object$plot)
+  } else {
+    print(plot_object)
+  }
+
+  # Close the file device to finish writing and save the PNG file
+  grDevices::dev.off()
+
+  # Print the plot a second time to send it to the RStudio Plots pane
+  if (inherits(plot_object, "ggsurvplot")) {
+    print(plot_object)
+  } else {
+    print(plot_object)
+  }
 }
 
 # Standardise TCGA sample barcodes to a uniform 15-character hyphenated format
 # (e.g., converts 'TCGA.KL.8323.01A' or 'TCGA-KL-8323-01A-11D' to 'TCGA-KL-8323-01')
 standardise_sample_id <- function(ids) {
-   ids_clean <- as.character(ids)
-   ids_clean <- stringr::str_replace_all(ids_clean, "\\.", "-")
-   ids_clean <- stringr::str_sub(ids_clean, start = 1L, end = 15L)
-   ids_clean
+  ids_clean <- as.character(ids)
+  ids_clean <- stringr::str_replace_all(ids_clean, "\\.", "-")
+  ids_clean <- stringr::str_sub(ids_clean, start = 1L, end = 15L)
+  ids_clean
 }

@@ -8,8 +8,8 @@
 #           prepare_mutations.R, and prepare_cna.R to have been sourced.
 #
 # Produces:
-#   clinical_rppa_rna_mutation_cna - Fully integrated analysis tibble used
-#                                    downstream by modelling scripts.
+#   clinical_rppa_rna_mutation - Fully integrated analysis tibble used
+#                                downstream by modelling scripts.
 #
 # Usage: this script is intended to be sourced by run_analysis.R.
 
@@ -24,7 +24,15 @@ required_tables <- c(
    "cna_features"
 )
 
+# Enforce defensive checks to ensure all upstream tables are present in memory
 check_required_objects(required_tables)
+
+# Defensive standardisation: Guarantee every table uses identical key formatting
+clinical_survival  <- clinical_survival  |> dplyr::mutate(sample_id = standardise_sample_id(.data$sample_id))
+rppa_proteomics    <- rppa_proteomics    |> dplyr::mutate(sample_id = standardise_sample_id(.data$sample_id))
+rnaseq_expression  <- rnaseq_expression  |> dplyr::mutate(sample_id = standardise_sample_id(.data$sample_id))
+mutation_features  <- mutation_features  |> dplyr::mutate(sample_id = standardise_sample_id(.data$sample_id))
+cna_features       <- cna_features       |> dplyr::mutate(sample_id = standardise_sample_id(.data$sample_id))
 
 for (tbl in required_tables) {
    check_has_sample_id(tbl)
@@ -63,7 +71,7 @@ if (n_dropped_rna > 0) {
 
 
 # 3. Integrate mutation features ----------------------------------------------
-# Missing values are only treated as wild-type (0) if the sample is confirmed 
+# Missing values are only treated as wild-type (0L) if the sample is confirmed 
 # to have undergone genomic sequencing.
 
 sequenced_sample_universe <- standardise_sample_id(unique(mutation_data$Tumor_Sample_Barcode))
@@ -87,7 +95,7 @@ clinical_rppa_rna_mutation <- clinical_rppa_rna_mutation |>
 
 
 # 4. Integrate Copy Number Alteration (CNA) features -------------------------
-# Missing values are only treated as unaltered (0) if the sample is confirmed
+# Missing values are only treated as unaltered (0L) if the sample is confirmed
 # to have successfully undergone copy-number profiling.
 
 cna_sample_universe <- standardise_sample_id(setdiff(
@@ -104,7 +112,7 @@ clinical_rppa_rna_mutation_cna <- clinical_rppa_rna_mutation |>
 # Pre-calculate logical alignment vector to avoid across() scoping bugs
 is_cna_profiled <- clinical_rppa_rna_mutation_cna$sample_id %in% cna_sample_universe
 
-clinical_rppa_rna_mutation_cna <- clinical_rppa_rna_mutation_cna |>
+clinical_rppa_rna_mutation_cna |>
    dplyr::mutate(
       dplyr::across(
          dplyr::starts_with("cna_", ignore.case = FALSE),
@@ -134,14 +142,29 @@ check_has_columns(
 )
 
 
-# Summarise integrated dataset ------------------------------------------------
+# Missingness Diagnostic Audit -------------------------------------------------
+# Explicitly check if any numeric multi-omics features are carrying unintended NAs
+
+na_audit <- clinical_rppa_rna_mutation |> 
+   dplyr::summarise(
+      total_rows      = dplyr::n(),
+      clinical_age_na = sum(is.na(.data$age)),
+      mut_na          = sum(is.na(dplyr::pick(dplyr::starts_with("mut_")))),
+      cna_na          = sum(is.na(dplyr::pick(dplyr::starts_with("cna_"))))
+   )
+
+message("\n===============================================")
+message("      MULTI-OMICS INTEGRATION QUALITY AUDIT      ")
+message("===============================================")
+print(na_audit)
+message("===============================================\n")
 
 mutation_summary <- summarise_mutations(clinical_rppa_rna_mutation)
 
 message(
    "Integration complete. ",
    nrow(clinical_rppa_rna_mutation),
-   " samples fully combined into multi-omics workspace with zeroed wild-types."
+   " samples fully combined into multi-omics workspace."
 )
 
 print(mutation_summary)

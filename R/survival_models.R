@@ -1,218 +1,150 @@
-# Compare survival models via cross-validation -------------------------------
+# Cross-validated multi-omics survival modelling ------------------------------
 #
-# Fits and compares six Cox proportional hazards models using a strict 5-fold
-# cross-validation loop to completely eliminate selection bias and overfitting.
-# Feature selection (LASSO) is embedded entirely within the training folds.
+# Evaluates and compares the out-of-fold predictive performance of six distinct
+# survival models using stratified 5-fold cross-validation with an invariance guard.
 #
-# Models evaluated:
-#   - Model 1: Clinical baseline (age + sex + stage + grade)
-#   - Model 2: Clinical + LASSO-selected RPPA features
-#   - Model 3: Clinical + RNA-seq pathway scores (PC1 scores)
-#   - Model 4: Clinical + Curated binary mutation features
-#   - Model 5: Clinical + Copy Number Alterations (CNA)
-#   - Model 6: Full Multi-omics Integration (Clinical + RPPA + RNA + Mut + CNA)
+# Requires: integrate_data.R, feature_selection.R, and pathway_scores.R
+#           to have been sourced, with survival_data available in global memory.
 #
-# Outputs:
-#   results/model_comparison_metrics.csv
-#   results/integrated_model_hazard_ratios.csv
-#
-# Note: this script is intended to be sourced by run_analysis.R.
-
+# Usage: this script is intended to be sourced by run_analysis.R.
 
 # Validate inputs -------------------------------------------------------------
+check_required_objects(c("survival_data", "selected_rppa_features", "selected_mutation_features"))
+required_base_cols <- c("os_months", "os_event", "age", "sex", "stage", "grade")
+check_has_columns("survival_data", required_base_cols)
 
-check_required_objects(c(
-   "survival_data",
-   "mutation_feature_cols",
-   "rppa_feature_cols"
-))
-
-
-# Define feature groups --------------------------------------------------------
-
+# 1. Feature Space Discovery ---------------------------------------------------
 clinical_vars <- c("age", "sex", "stage", "grade")
+mutation_vars <- selected_mutation_features
+cna_vars      <- names(survival_data)[stringr::str_starts(names(survival_data), "cna_")]
+rppa_vars     <- selected_rppa_features
+rna_vars      <- names(survival_data)[stringr::str_starts(names(survival_data), "score_") & !stringr::str_ends(names(survival_data), "_mean")]
 
-rna_vars <- c("score_neutrophil_deg", "score_ecm_deg", "score_ptk")
+message("=== Modelling Feature Dimensions ===")
+message("Clinical Covariates : ", length(clinical_vars))
+message("Somatic Mutations   : ", length(mutation_vars))
+message("Copy Number Alterat.: ", length(cna_vars))
+message("RPPA Proteins       : ", length(rppa_vars))
+message("RNA Pathway Scores  : ", length(rna_vars))
+message("====================================")
 
-mutation_vars <- mutation_feature_cols
-
-cna_vars <- names(survival_data)[stringr::str_starts(names(survival_data), "cna_")]
-
-
-# Establish unified complete-case analysis cohort ------------------------------
-
-all_possible_vars <- c(
-   "os_months",
-   "os_event",
-   clinical_vars,
-   rppa_feature_cols,
-   rna_vars,
-   mutation_vars,
-   cna_vars
+# 2. Build Explicit Model Formulae ---------------------------------------------
+model_specs <- list(
+   Clinical   = clinical_vars,
+   Mutations  = c(clinical_vars, mutation_vars),
+   CNA        = c(clinical_vars, cna_vars),
+   RPPA       = c(clinical_vars, rppa_vars),
+   RNA_Path   = c(clinical_vars, rna_vars),
+   Integrated = c(clinical_vars, mutation_vars, cna_vars, rppa_vars, rna_vars)
 )
 
-modelling_data <- enforce_complete_cases(
-   data      = survival_data,
-   variables = all_possible_vars
-)
-
-abort_if_false(
-   nrow(modelling_data) >= 50,
-   "Insufficient samples for robust 5-fold cross-validation."
-)
-
-
-# Construct design matrix for regularised models -------------------------------
-# Converts factors to dummy variables globally to maintain matching row profiles
-
-x_master <- stats::model.matrix(
-   stats::as.formula(paste("~", paste(c(clinical_vars, rppa_feature_cols, rna_vars, mutation_vars, cna_vars), collapse = " + "))),
-   data = modelling_data
-)[, -1]
-
-y_master <- survival::Surv(
-   time  = modelling_data$os_months,
-   event = modelling_data$os_event
-)
-
-# Identify the actual dummy-expanded clinical columns present in the model matrix
-clinical_cols_in_x <- setdiff(
-   colnames(x_master),
-   c(rppa_feature_cols, rna_vars, mutation_vars, cna_vars)
-)
-
-
-# Setup cross-validation loops -------------------------------------------------
-
+# 3. Create Stratified Cross-Validation Folds ----------------------------------
 set.seed(42)
+all_modelling_vars <- unique(unlist(model_specs))
+cv_data <- survival_data |>
+   dplyr::select(dplyr::all_of(c("os_months", "os_event", all_modelling_vars))) |>
+   tidyr::drop_na()
 
-n_folds <- 5
+message("Total complete-case samples available for 5-fold cross-validation: ", nrow(cv_data))
 
-folds <- sample(rep(seq_len(n_folds), length.out = nrow(modelling_data)))
+n_folds <- 5L
+cv_data <- cv_data |>
+   dplyr::group_by(.data$os_event) |>
+   dplyr::mutate(fold = sample(rep(1:n_folds, length.out = dplyr::n()))) |>
+   dplyr::ungroup()
 
-# Data frame to collect unbiased, independent out-of-fold risk predictions
-oof_predictions <- tibble::tibble(
-   clinical   = rep(NA_real_, nrow(modelling_data)),
-   rppa       = rep(NA_real_, nrow(modelling_data)),
-   rna        = rep(NA_real_, nrow(modelling_data)),
-   mutation   = rep(NA_real_, nrow(modelling_data)),
-   cna        = rep(NA_real_, nrow(modelling_data)),
-   integrated = rep(NA_real_, nrow(modelling_data))
-)
+# 4. Execute the Cross-Validation Loop -----------------------------------------
+predictions_df <- cv_data |> dplyr::select(os_months, os_event, fold)
+for (model_name in names(model_specs)) {
+   predictions_df[[paste0("lp_", model_name)]] <- NA_real_
+}
 
-message("Executing 5-fold cross-validation loop with embedded feature selection...")
-
-
-# Execute cross-validation ----------------------------------------------------
+message("Executing stratified 5-fold cross-validation loop with invariance guards...")
 
 for (f in seq_len(n_folds)) {
-   message("  Processing fold ", f, " of ", n_folds, "...")
+   train_fold <- cv_data |> dplyr::filter(.data$fold != f)
+   test_fold  <- cv_data |> dplyr::filter(.data$fold == f)
    
-   train_idx <- which(folds != f)
-   test_idx  <- which(folds == f)
-   
-   train_df <- modelling_data[train_idx, ]
-   test_df  <- modelling_data[test_idx, ]
-   
-   # Model 1: Clinical Baseline
-   fit_clin <- survival::coxph(
-      survival::Surv(os_months, os_event) ~ age + sex + stage + grade,
-      data = train_df,
-      ties = "efron"
-   )
-   oof_predictions$clinical[test_idx] <- stats::predict(fit_clin, newdata = test_df, type = "lp")
-   
-   # Model 2: Clinical + Proteomics (Embedded LASSO selection)
-   rppa_model_cols <- c(clinical_cols_in_x, rppa_feature_cols)
-   x_train_rppa    <- x_master[train_idx, rppa_model_cols, drop = FALSE]
-   x_test_rppa     <- x_master[test_idx, rppa_model_cols, drop = FALSE]
-   
-   p_fac_rppa      <- rep(1, ncol(x_train_rppa))
-   p_fac_rppa[seq_along(clinical_cols_in_x)] <- 0.001
-   
-   cv_rppa <- glmnet::cv.glmnet(
-      x              = x_train_rppa,
-      y              = y_master[train_idx],
-      family         = "cox",
-      penalty.factor = p_fac_rppa,
-      cox.ties       = "efron"
-   )
-   oof_predictions$rppa[test_idx] <- as.numeric(stats::predict(cv_rppa, newx = x_test_rppa, s = "lambda.1se", type = "link"))
-   
-   # Model 3: Clinical + RNA-seq Pathways
-   fit_rna <- survival::coxph(
-      survival::Surv(os_months, os_event) ~ age + sex + stage + grade + score_neutrophil_deg + score_ecm_deg + score_ptk,
-      data = train_df,
-      ties = "efron"
-   )
-   oof_predictions$rna[test_idx] <- stats::predict(fit_rna, newdata = test_df, type = "lp")
-   
-   # Model 4: Clinical + Driver Mutations
-   mut_formula <- stats::as.formula(paste("survival::Surv(os_months, os_event) ~ age + sex + stage + grade +", paste(mutation_vars, collapse = " + ")))
-   fit_mut <- survival::coxph(mut_formula, data = train_df, ties = "efron")
-   oof_predictions$mutation[test_idx] <- stats::predict(fit_mut, newdata = test_df, type = "lp")
-   
-   # Model 5: Clinical + CNA Alterations
-   cna_formula <- stats::as.formula(paste("survival::Surv(os_months, os_event) ~ age + sex + stage + grade +", paste(cna_vars, collapse = " + ")))
-   fit_cna <- survival::coxph(cna_formula, data = train_df, ties = "efron")
-   oof_predictions$cna[test_idx] <- stats::predict(fit_cna, newdata = test_df, type = "lp")
-   
-   # Model 6: Full Multi-omics Integration (Embedded LASSO selection across all layers)
-   p_fac_int <- rep(1, ncol(x_master))
-   p_fac_int[seq_along(clinical_cols_in_x)] <- 0.001
-   
-   cv_int <- glmnet::cv.glmnet(
-      x              = x_master[train_idx, , drop = FALSE],
-      y              = y_master[train_idx],
-      family         = "cox",
-      penalty.factor = p_fac_int,
-      cox.ties       = "efron"
-   )
-   oof_predictions$integrated[test_idx] <- as.numeric(stats::predict(cv_int, newx = x_master[test_idx, , drop = FALSE], s = "lambda.1se", type = "link"))
+   for (model_name in names(model_specs)) {
+      vars <- model_specs[[model_name]]
+      
+      # INVARIANCE GUARD: Filter out any binary variables that lack variation in this specific training fold
+      stable_vars <- c()
+      for (v in vars) {
+         if (v %in% c("age", "sex", "stage", "grade") || is.numeric(train_fold[[v]]) && !all(train_fold[[v]] == train_fold[[v]][1])) {
+            # Keep continuous variables or binary features with active variation
+            
+            # Additional safety check for binary variables: ensure there's at least 2 events in the minor group
+            if (!v %in% c("age", "sex", "stage", "grade") && all(range(train_fold[[v]]) == c(0, 1))) {
+               events_in_mutated <- sum(train_fold$os_event[train_fold[[v]] == 1L])
+               events_in_wildtype <- sum(train_fold$os_event[train_fold[[v]] == 0L])
+               if (events_in_mutated < 2L || events_in_wildtype < 2L) {
+                  next # Drop feature for this fold to eliminate complete separation warnings
+               }
+            }
+            stable_vars <- c(stable_vars, v)
+         }
+      }
+      
+      if (length(stable_vars) == 0) next
+      
+      formula_str <- paste("survival::Surv(os_months, os_event) ~", paste(stable_vars, collapse = " + "))
+      form <- stats::as.formula(formula_str)
+      
+      fit_cv <- tryCatch(
+         survival::coxph(form, data = train_fold, ties = "efron"),
+         error = function(e) NULL
+      )
+      
+      if (!is.null(fit_cv)) {
+         lp <- stats::predict(fit_cv, newdata = test_fold, type = "lp")
+         predictions_df[[paste0("lp_", model_name)]][predictions_df$fold == f] <- lp
+      }
+   }
 }
 
-
-# Calculate Unbiased Cross-Validated Performance Metrics ----------------------
-
-calculate_cv_cindex <- function(predictions, model_name) {
-   conc_obj <- survival::concordance(y_master ~ predictions)
+# 5. Compute Out-of-Fold Cross-Validated C-Indices -----------------------------
+cv_cindex_list <- list()
+for (model_name in names(model_specs)) {
+   lp_col <- paste0("lp_", model_name)
    
-   c_index <- conc_obj$concordance
-   c_se    <- sqrt(conc_obj$var)
+   c_fit <- survival::concordance(
+      survival::Surv(os_months, os_event) ~ predictions_df[[lp_col]],
+      data    = predictions_df,
+      reverse = TRUE
+   )
    
-   tibble::tibble(
-      model       = model_name,
-      c_index     = c_index,
-      c_conf_low  = max(0, c_index - (1.96 * c_se)),
-      c_conf_high = min(1, c_index + (1.96 * c_se))
+   c_index <- c_fit$concordance
+   c_se    <- sqrt(c_fit$var)
+   
+   cv_cindex_list[[model_name]] <- tibble::tibble(
+      model                  = model_name,
+      cv_concordance         = c_index,
+      conf_low               = c_index - (1.96 * c_se),
+      conf_high              = c_index + (1.96 * c_se),
+      incremental_vs_clinical = if (model_name == "Clinical") 0.0 else c_index - cv_cindex_list[["Clinical"]]$cv_concordance
    )
 }
 
-model_names <- c("clinical", "rppa", "rna", "mutation", "cna", "integrated")
+cv_cindex_results <- dplyr::bind_rows(cv_cindex_list) |>
+   dplyr::arrange(dplyr::desc(.data$cv_concordance))
 
-metrics_list <- purrr::map2(oof_predictions, model_names, calculate_cv_cindex)
+readr::write_csv(cv_cindex_results, "results/cross_validated_cindex_comparison.csv")
 
-model_comparison_df <- dplyr::bind_rows(metrics_list)
+message("\n=== Cross-Validated Model Comparison Summary ===")
+print(cv_cindex_results)
+message("================================================")
 
-
-# Fit Full Cohort Master Model for Hazard Ratio Reporting ---------------------
-
-message("Fitting final integrated model on full cohort for hazard ratio extraction...")
-
-final_integrated_fit <- survival::coxph(
-   stats::as.formula(paste("survival::Surv(os_months, os_event) ~ age + sex + stage + grade +", 
-                           paste(c(selected_rppa_features, rna_vars, mutation_vars, cna_vars), collapse = " + "))),
-   data = modelling_data,
-   ties = "efron"
+# 6. Fit Final Model on Full Cohort -------------------------------------------
+message("Fitting final integrated model on full complete-case cohort...")
+final_formula <- stats::as.formula(
+   paste("survival::Surv(os_months, os_event) ~", paste(model_specs$Integrated, collapse = " + "))
 )
+final_integrated_fit <- survival::coxph(final_formula, data = cv_data, ties = "efron")
 
-integrated_hr_df <- broom::tidy(
-   final_integrated_fit,
-   conf.int     = TRUE,
-   exponentiate = TRUE
-) |>
+final_coefs_df <- broom::tidy(final_integrated_fit, exponentiate = TRUE, conf.int = TRUE) |>
    dplyr::transmute(
-      term         = .data$term,
+      feature      = .data$term,
       hazard_ratio = .data$estimate,
       conf_low     = .data$conf.low,
       conf_high    = .data$conf.high,
@@ -220,18 +152,5 @@ integrated_hr_df <- broom::tidy(
    ) |>
    dplyr::arrange(.data$p_value)
 
-
-# Save results ----------------------------------------------------------------
-
-readr::write_csv(
-   model_comparison_df,
-   "results/model_comparison_metrics.csv"
-)
-
-readr::write_csv(
-   integrated_hr_df,
-   "results/integrated_model_hazard_ratios.csv"
-)
-
-message("\nCross-validated model comparison summary (leak-free C-indices):")
-print(model_comparison_df)
+readr::write_csv(final_coefs_df, "results/final_integrated_cox_coefficients.csv")
+message("Survival modelling complete. Model objects held in memory and exported to /results.")

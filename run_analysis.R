@@ -23,7 +23,6 @@
 
 
 # Project structure check ------------------------------------------------------
-# Confirm that the R/ directory exists before trying to source any scripts.
 
 if (!dir.exists("R")) {
   stop(
@@ -35,7 +34,6 @@ if (!dir.exists("R")) {
 }
 
 # Output directory setup -------------------------------------------------------
-# Create the results directory early so that log and session files can be saved.
 
 if (!dir.exists("results")) {
   dir.create("results", recursive = TRUE)
@@ -45,7 +43,6 @@ if (!dir.exists("figures")) {
 }
 
 # Pipeline log file ------------------------------------------------------------
-# Save a plain-text log of the pipeline run in the results directory.
 
 log_file_path <- file.path("results", "pipeline_log.txt")
 
@@ -59,13 +56,10 @@ writeLines(
 )
 
 # Logging helper ---------------------------------------------------------------
-# Write wrapper messages to both the console and the pipeline log file.
 
 log_message <- function(...) {
   message_text <- paste0(...)
-
   message(message_text)
-
   write(
     x = message_text,
     file = log_file_path,
@@ -74,7 +68,6 @@ log_message <- function(...) {
 }
 
 # Time-formatting helper -------------------------------------------------------
-# Report sub-second runtimes in milliseconds so fast steps do not appear as 0 s.
 
 format_elapsed_time <- function(time_seconds) {
   if (time_seconds < 1) {
@@ -85,29 +78,36 @@ format_elapsed_time <- function(time_seconds) {
 }
 
 # Pipeline step definitions ----------------------------------------------------
-# Store the pipeline order in one place so it is easy to edit later without
-# renaming files.
+# Re-sequenced to avoid circular scoping crashes and missing variables!
 
 pipeline_steps <- tibble::tribble(
   ~path,                                    ~step_name,
+  # Phase 1: Core Utilities & Workspace Initialization
   file.path("R", "utils_validation.R"),     "Validation error helper functions",
   file.path("R", "setup.R"),                "Package setup and configuration",
   file.path("R", "load_data.R"),            "Load raw cBioPortal data",
+  
+  # Phase 2: Individual Layer Data Cleaning (Isolation Stage)
   file.path("R", "prepare_clinical.R"),     "Prepare clinical survival table",
   file.path("R", "prepare_rppa.R"),         "Prepare RPPA proteomics data",
   file.path("R", "prepare_rnaseq.R"),       "Prepare RNA-seq data",
   file.path("R", "prepare_mutations.R"),    "Prepare binary mutation features",
   file.path("R", "prepare_cna.R"),          "Prepare binary CNA features",
-  file.path("R", "integrate_data.R"),       "Integrate all data layers",
-  file.path("R", "quick_survival_check.R"), "Quick survival check",
-  file.path("R", "feature_selection.R"),    "Screen RPPA for features",
-  file.path("R", "pathway_scores.R"),       "Calculate pathway scores",
-  file.path("R", "survival_models.R"),      "Compare survival models",
+  
+  # Phase 3: Master Cohort Integration & Clinical Benchmarking
+  file.path("R", "integrate_data.R"),       "Integrate multi-omics data layers",
+  file.path("R", "quick_survival_check.R"), "Baseline cohort survival check",
+  
+  # # Phase 4: Downstream Multi-Omics Feature Extraction
+  file.path("R", "feature_selection.R"),    "Screen RPPA - multivariable LASSO",
+  file.path("R", "pathway_scores.R"),       "Calculate RNA pathway scores",
+  
+  # Phase 5: Final Cross-Validated Modelling & Publication Figures
+  file.path("R", "survival_models.R"),      "Compare cross-validated models",
   file.path("R", "results_figures.R"),      "Create report-ready outputs"
 )
 
 # Pipeline script existence check ----------------------------------------------
-# Check that every expected script file exists before the pipeline starts.
 
 missing_scripts <- pipeline_steps |>
   dplyr::filter(!file.exists(path))
@@ -121,22 +121,17 @@ if (nrow(missing_scripts) > 0) {
 }
 
 # Helper function for one pipeline step ----------------------------------------
-# Source one script, print the step name, capture messages and warnings from
-# the sourced script, and stop with a helpful error message if the step fails.
 
 source_step <- function(path, step_name) {
-  # Generate clean plain text strings for file logs
   plain_header <- strrep("-", 60)
   plain_step <- paste0("Step: ", step_name)
   plain_script <- paste0("Script: ", path)
 
-  # Print structural pipeline frames in clean, solid black text
   cli::cli_text(cli::col_black(plain_header))
   cli::cli_text(cli::style_bold(cli::col_black(plain_step)))
   cli::cli_text(cli::col_black(plain_script))
   cli::cli_text(cli::col_black(plain_header))
 
-  # Log unstyled strings to file
   write(
     x = c(plain_header, plain_step, plain_script, plain_header),
     file = log_file_path, append = TRUE
@@ -153,49 +148,32 @@ source_step <- function(path, step_name) {
           "Script: ", path, "\n",
           "Error: ", conditionMessage(e)
         )
-
-        write(
-          x = error_message,
-          file = log_file_path,
-          append = TRUE
-        )
-
+        write(x = error_message, file = log_file_path, append = TRUE)
         stop(error_message, call. = FALSE)
       }
     ),
     message = function(m) {
       message_text <- conditionMessage(m)
-
-      # Inject the text smoothly without nested brace confusion
       cli::cli_text(paste0(
         cli::col_cyan("\u2139\ufe0f [MESSAGE] "),
         message_text
       ))
-
       write(
         x = paste0("[MESSAGE] ", message_text),
-        file = log_file_path,
-        append = TRUE
+        file = log_file_path, append = TRUE
       )
-
       invokeRestart("muffleMessage")
     },
     warning = function(w) {
       warning_text <- conditionMessage(w)
-
       cli::cli_text(paste0(
         cli::col_yellow("\u26a0\ufe0f [WARNING] "),
-        cli::col_yellow(step_name),
-        ": ",
-        warning_text
+        cli::col_yellow(step_name), ": ", warning_text
       ))
-
       write(
         x = paste0("[WARNING] ", step_name, ": ", warning_text),
-        file = log_file_path,
-        append = TRUE
+        file = log_file_path, append = TRUE
       )
-
       invokeRestart("muffleWarning")
     }
   )
@@ -203,23 +181,17 @@ source_step <- function(path, step_name) {
   elapsed <- unname((proc.time() - t_start)[["elapsed"]])
   formatted_time <- format_elapsed_time(elapsed)
 
-  # Print the completion string cleanly
   cli::cli_text(cli::col_green(paste0(
-    "\u2705 Completed ",
-    step_name,
-    " in ",
+    "\u2705 Completed ", step_name, " in ",
     formatted_time, "."
   )))
-
   write(
     x = paste0("Completed ", step_name, " in ", formatted_time, "."),
-    file = log_file_path,
-    append = TRUE
+    file = log_file_path, append = TRUE
   )
 }
 
 # Run pipeline -----------------------------------------------------------------
-# Source each script in order and measure the total runtime of the pipeline.
 
 t_pipeline_start <- proc.time()
 
@@ -234,7 +206,6 @@ total_elapsed <- unname((proc.time() - t_pipeline_start)[["elapsed"]])
 formatted_total_time <- format_elapsed_time(total_elapsed)
 
 # Save session information -----------------------------------------------------
-# Save R version, platform, and loaded package versions for reproducibility.
 
 session_info_path <- file.path("results", "session_info.txt")
 
@@ -243,26 +214,20 @@ writeLines(
   con = session_info_path
 )
 
-# Print a striking final pipeline completion block
 cli::cli_text(cli::col_green(strrep("=", 60)))
 cli::cli_text(cli::style_bold(cli::col_green(
   paste0(
     "\ud83c\udf89 Pipeline complete. Total time: ",
-    formatted_total_time,
-    "."
+    formatted_total_time, "."
   )
 )))
 cli::cli_text(cli::col_green(strrep("=", 60)))
-cli::cli_text(cli::col_grey(paste0(
-  "Session info written to ",
-  session_info_path
-)))
+
 write(
   x = c(
     strrep("=", 60),
     paste0("Pipeline complete. Total time: ", formatted_total_time, "."),
-    strrep("=", 60),
-    paste0("Session info written to ", session_info_path)
+    strrep("=", 60)
   ),
   file = log_file_path,
   append = TRUE

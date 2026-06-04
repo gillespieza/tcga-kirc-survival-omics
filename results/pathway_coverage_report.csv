@@ -1,4 +1,9 @@
 pathway,n_present,n_total,pct_coverage
-ecm_deg,1819,2024,89.87154150197628
-ptk,720,779,92.42618741976894
-neutrophil_deg,13,13,100
+inflammatory_response,1912,2153,88.80631676730144
+ecm_remodelling,1819,2024,89.87154150197628
+metalloprotease_activity,174,190,91.57894736842105
+kinase_signalling,663,721,91.95561719833564
+neutrophil_activation,55,58,94.82758620689656
+hallmark_inflammation,197,200,98.5
+kinase_activity,162,163,99.38650306748467
+neutrophil_degranulation,13,13,100
