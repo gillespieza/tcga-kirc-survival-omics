@@ -30,19 +30,19 @@
 check_required_objects("mutation_data")
 
 check_has_columns(
-   "mutation_data",
-   c("Tumor_Sample_Barcode", "Hugo_Symbol")
+  "mutation_data",
+  c("Tumor_Sample_Barcode", "Hugo_Symbol")
 )
 
 abort_if_false(
-   nrow(mutation_data) > 0,
-   "mutation_data has zero rows after loading. Check data_mutations.txt."
+  nrow(mutation_data) > 0,
+  "mutation_data has zero rows after loading. Check data_mutations.txt."
 )
 
 message(
-   "Input mutation data: ",
-   nrow(mutation_data), " rows x ",
-   ncol(mutation_data), " cols."
+  "Input mutation data: ",
+  nrow(mutation_data), " rows x ",
+  ncol(mutation_data), " cols."
 )
 
 
@@ -51,34 +51,51 @@ message(
 # Sources: doi:10.1038/nature12222 and doi:10.1158/1078-0432.CCR-15-2631
 
 driver_genes <- c(
-   "VHL",   # Core ccRCC tumour suppressor; VHL loss drives HIF/hypoxia and angiogenesis biology
-   "PBRM1", # Chromatin-remodelling tumour suppressor frequently mutated in ccRCC
-   "BAP1",  # Tumour suppressor associated with more aggressive ccRCC and poorer prognosis
-   "SETD2", # Chromatin/histone methyltransferase gene altered in ccRCC
-   "KDM5C", # Chromatin-regulation gene recurrently altered in ccRCC
-   "MTOR",  # Kinase pathway gene; links to PI3K/AKT/mTOR signalling and targeted therapy
-   "PTEN",  # Negative regulator of PI3K/AKT signalling; recurrently altered in TCGA ccRCC
-   "TSC1",  # mTOR pathway regulator; TSC1/TSC2/MTOR mutations linked to rapalog response
-   "TSC2"   # mTOR pathway regulator that functions with TSC1 to suppress mTORC1 signalling
+  # Core ccRCC tumour suppressor; loss drives HIF/hypoxia, angiogenesis biology
+  "VHL",
+
+  # Chromatin-remodelling tumour suppressor frequently mutated in ccRCC
+  "PBRM1",
+
+  # Tumour suppressor associated with more aggressive ccRCC & poorer prognosis
+  "BAP1",
+
+  # Chromatin/histone methyltransferase gene altered in ccRCC
+  "SETD2",
+
+  # Chromatin-regulation gene recurrently altered in ccRCC
+  "KDM5C",
+
+  # Kinase pathway gene; links to PI3K/AKT/mTOR signalling and targeted therapy
+  "MTOR",
+
+  # Negative regulator of PI3K/AKT signalling; recurrently altered in ccRCC
+  "PTEN",
+
+  # mTOR pathway regulator; TSC1/TSC2/MTOR mutations linked to rapalog response
+  "TSC1",
+
+  # mTOR pathway regulator, functions with TSC1 to suppress mTORC1 signalling
+  "TSC2"
 )
 
 # Convert long mutation table to binary sample-by-gene matrix ----------------
 # Each driver gene that appears at least once in a sample is counted as
 # mutated (1); all other driver genes are coded as not mutated (0).
 mutation_long <- mutation_data |>
-   dplyr::transmute(
-      sample_id   = .data$Tumor_Sample_Barcode,
-      gene_symbol = .data$Hugo_Symbol
-   ) |>
-   dplyr::filter(gene_symbol %in% driver_genes) |>
-   dplyr::distinct(sample_id, gene_symbol)
+  dplyr::transmute(
+    sample_id   = .data$Tumor_Sample_Barcode,
+    gene_symbol = .data$Hugo_Symbol
+  ) |>
+  dplyr::filter(.data$gene_symbol %in% driver_genes) |>
+  dplyr::distinct(sample_id, gene_symbol)
 
 abort_if_false(
-   nrow(mutation_long) > 0,
-   paste(
-      "No mutations in the selected driver genes were found in mutation_data.",
-      "Check that the study and driver_genes are correct."
-   )
+  nrow(mutation_long) > 0,
+  paste(
+    "No mutations in the selected driver genes were found in mutation_data.",
+    "Check that the study and driver_genes are correct."
+  )
 )
 
 # Warn early if any driver genes are entirely absent from the mutation data,
@@ -86,96 +103,96 @@ abort_if_false(
 unobserved_genes <- setdiff(driver_genes, unique(mutation_long$gene_symbol))
 
 if (length(unobserved_genes) > 0) {
-   message(
-      "The following driver gene(s) have no mutations in this dataset and ",
-      "will be added as all-zero columns: ",
-      paste(unobserved_genes, collapse = ", ")
-   )
+  message(
+    "The following driver gene(s) have no mutations in this dataset and ",
+    "will be added as all-zero columns: ",
+    paste(unobserved_genes, collapse = ", ")
+  )
 }
 
 # Count at least one mutation per sample/gene, pivot to wide, and binarise.
 mutation_features <- mutation_long |>
-   dplyr::count(
-      sample_id,
-      gene_symbol,
-      name = "mutated"
-   ) |>
-   tidyr::pivot_wider(
-      names_from  = gene_symbol,
-      values_from = mutated,
-      values_fill = 0L
-   ) |>
-   dplyr::mutate(
-      dplyr::across(
-         -sample_id,
-         ~ as.integer(.x > 0)
-      )
-   ) |>
-   dplyr::rename_with(
-      ~ paste0("mut_", .x),
-      -sample_id
-   )
+  dplyr::count(
+    .data$sample_id,
+    .data$gene_symbol,
+    name = "mutated"
+  ) |>
+  tidyr::pivot_wider(
+    names_from  = "gene_symbol",
+    values_from = "mutated",
+    values_fill = 0L
+  ) |>
+  dplyr::mutate(
+    dplyr::across(
+      -dplyr::all_of("sample_id"),
+      ~ as.integer(.x > 0)
+    )
+  ) |>
+  dplyr::rename_with(
+    ~ paste0("mut_", .x),
+    -dplyr::all_of("sample_id")
+  )
 
 # Add all-zero columns for driver genes not observed in the mutation data,
 # so that the feature table is complete and consistently ordered regardless
 # of which genes happen to appear in this dataset.
 
-all_mut_cols     <- paste0("mut_", driver_genes)
+all_mut_cols <- paste0("mut_", driver_genes)
 missing_mut_cols <- setdiff(all_mut_cols, names(mutation_features))
 
 if (length(missing_mut_cols) > 0) {
-   mutation_features[missing_mut_cols] <- 0L
+  mutation_features[missing_mut_cols] <- 0L
 }
 
 mutation_features <- mutation_features |>
-   dplyr::select(
-      sample_id,
-      dplyr::all_of(all_mut_cols)
-   )
+  dplyr::select(
+    dplyr::all_of("sample_id"),
+    dplyr::all_of(all_mut_cols)
+  )
 
 
 # Validate output -------------------------------------------------------------
 
 abort_if_false(
-   nrow(mutation_features) > 0,
-   "mutation_features must be non-empty."
+  nrow(mutation_features) > 0,
+  "mutation_features must be non-empty."
 )
 
 abort_if_false(
-   "sample_id" %in% names(mutation_features),
-   "mutation_features must contain sample_id."
+  "sample_id" %in% names(mutation_features),
+  "mutation_features must contain sample_id."
 )
 
 abort_if_false(
-   all(all_mut_cols %in% names(mutation_features)),
-   "mutation_features must have all driver gene columns."
+  all(all_mut_cols %in% names(mutation_features)),
+  "mutation_features must have all driver gene columns."
 )
 
 
 # Summarise mutation frequencies ----------------------------------------------
 
 mutation_summary <- mutation_features |>
-   dplyr::summarise(
-      dplyr::across(
-         dplyr::starts_with("mut_"),
-         sum
-      )
-   ) |>
-   tidyr::pivot_longer(
-      cols      = dplyr::everything(),
-      names_to  = "gene",
-      values_to = "n_mutated"
-   ) |>
-   dplyr::mutate(
-      gene        = stringr::str_remove(.data$gene, "^mut_"),
-      pct_mutated = round(100 * .data$n_mutated / nrow(mutation_features), 1)
-   ) |>
-   dplyr::arrange(dplyr::desc(.data$n_mutated))
+  dplyr::summarise(
+    dplyr::across(
+      dplyr::starts_with("mut_"),
+      sum
+    )
+  ) |>
+  tidyr::pivot_longer(
+    cols      = dplyr::everything(),
+    names_to  = "gene",
+    values_to = "n_mutated"
+  ) |>
+  dplyr::mutate(
+    gene        = stringr::str_remove(.data$gene, "^mut_"),
+    pct_mutated = round(100 * .data$n_mutated / nrow(mutation_features), 1)
+  ) |>
+  dplyr::arrange(dplyr::desc(.data$n_mutated))
 
 message(
-   "Mutation feature table prepared: ",
-   nrow(mutation_features), " samples x ",
-   length(all_mut_cols), " driver gene features."
+  "Mutation feature table prepared: ",
+  nrow(mutation_features), " samples x ",
+  length(all_mut_cols), " driver gene features."
 )
 
 print(mutation_summary)

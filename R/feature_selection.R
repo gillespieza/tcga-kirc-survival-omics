@@ -29,40 +29,42 @@
 check_required_objects("survival_data")
 
 required_survival_cols <- c(
-   "patient_id",
-   "sample_id",
-   "os_months",
-   "os_event",
-   "age",
-   "sex",
-   "stage",
-   "grade"
+  "patient_id",
+  "sample_id",
+  "os_months",
+  "os_event",
+  "age",
+  "sex",
+  "stage",
+  "grade"
 )
 
 check_has_columns(
-   "survival_data",
-   required_survival_cols
+  "survival_data",
+  required_survival_cols
 )
 
 
 # Column classification --------------------------------------------------------
-# Identify clinical, mutation, RNA, and RPPA feature columns. Clinical, mutation,
+# Identify clinical, mutation, RNA, & RPPA feature columns. Clinical, mutation,
 # and RNA columns are excluded from RPPA screening so this script focuses on
 # protein (RPPA) features.
 
 all_col_names <- names(survival_data)
 
+clinical_cols <- required_survival_cols
+
 mutation_feature_cols <- all_col_names[
-   stringr::str_starts(all_col_names, "mut_")
+  stringr::str_starts(all_col_names, "mut_")
 ]
 
 rna_feature_cols <- all_col_names[
-   stringr::str_starts(all_col_names, "rna_")
+  stringr::str_starts(all_col_names, "rna_")
 ]
 
 rppa_feature_cols <- setdiff(
-   all_col_names,
-   c(clinical_cols, mutation_feature_cols, rna_feature_cols)
+  all_col_names,
+  c(clinical_cols, mutation_feature_cols, rna_feature_cols)
 )
 
 # Filter RPPA candidates -------------------------------------------------------
@@ -70,39 +72,39 @@ rppa_feature_cols <- setdiff(
 # a Cox model.
 
 rppa_feature_cols <- rppa_feature_cols[
-   vapply(
-      survival_data[rppa_feature_cols],
-      function(x) {
-         is.numeric(x) &&
-            sum(!is.na(x)) >= 30 &&
-            stats::sd(x, na.rm = TRUE) > 0
-      },
-      logical(1)
-   )
+  vapply(
+    survival_data[rppa_feature_cols],
+    function(x) {
+      is.numeric(x) &&
+        sum(!is.na(x)) >= 30 &&
+        stats::sd(x, na.rm = TRUE) > 0
+    },
+    logical(1)
+  )
 ]
 
 abort_if_false(
-   length(rppa_feature_cols) > 0,
-   "No usable numeric RPPA features were found for Cox screening."
+  length(rppa_feature_cols) > 0,
+  "No usable numeric RPPA features were found for Cox screening."
 )
 
 # Drop mutation features with prevalence below 5 % to avoid overfitting
 # downstream on nearly-absent alterations.
 
 mutation_feature_cols <- mutation_feature_cols[
-   vapply(
-      survival_data[mutation_feature_cols],
-      function(x) mean(x, na.rm = TRUE) >= 0.05,
-      logical(1)
-   )
+  vapply(
+    survival_data[mutation_feature_cols],
+    function(x) mean(x, na.rm = TRUE) >= 0.05,
+    logical(1)
+  )
 ]
 
 if (length(mutation_feature_cols) == 0) {
-   warning(
-      "No mutation feature columns passed the prevalence filter; ",
-      "mutation models will be skipped.",
-      call. = FALSE
-   )
+  warning(
+    "No mutation feature columns passed the prevalence filter; ",
+    "mutation models will be skipped.",
+    call. = FALSE
+  )
 }
 
 # Univariable Cox screen ------------------------------------------------------
@@ -110,64 +112,63 @@ if (length(mutation_feature_cols) == 0) {
 # which is fragile when feature names contain special characters.
 
 fit_univariable_rppa <- function(feature_name) {
-   model_data <- survival_data |>
-      dplyr::select(
-         os_months,
-         os_event,
-         feature = dplyr::all_of(feature_name)
-      ) |>
-      tidyr::drop_na()
-   
-   if (nrow(model_data) < 30 || length(unique(model_data$feature)) < 2) {
-      return(NULL)
-   }
-   
-   fit <- tryCatch(
-      survival::coxph(
-         survival::Surv(os_months, os_event) ~ feature,
-         data = model_data,
-         ties = "efron"
-      ),
-      error = function(e) NULL
-   )
-   
-   if (is.null(fit)) {
-      return(NULL)
-   }
-   
-   broom::tidy(
-      fit,
-      conf.int     = TRUE,
-      exponentiate = TRUE
-   ) |>
-      dplyr::slice(1) |>
-      dplyr::transmute(
-         feature      = feature_name,
-         n            = nrow(model_data),
-         events       = sum(model_data$os_event),  # <- use model_data here
-         hazard_ratio = estimate,
-         conf_low     = conf.low,
-         conf_high    = conf.high,
-         p_value      = p.value
-      )
+  model_data <- survival_data |>
+    dplyr::select(
+      dplyr::all_of(c("os_months", "os_event")),
+      feature = dplyr::all_of(feature_name)
+    ) |>
+    tidyr::drop_na()
+
+  if (nrow(model_data) < 30 || length(unique(model_data$feature)) < 2) {
+    return(NULL)
+  }
+
+  fit <- tryCatch(
+    survival::coxph(
+      survival::Surv(os_months, os_event) ~ feature,
+      data = model_data,
+      ties = "efron"
+    ),
+    error = function(e) NULL
+  )
+
+  if (is.null(fit)) {
+    return(NULL)
+  }
+
+  broom::tidy(
+    fit,
+    conf.int     = TRUE,
+    exponentiate = TRUE
+  ) |>
+    dplyr::slice(1) |>
+    dplyr::transmute(
+      feature      = feature_name,
+      n            = nrow(model_data),
+      events       = sum(model_data$os_event),
+      hazard_ratio = .data$estimate,
+      conf_low     = .data$conf.low,
+      conf_high    = .data$conf.high,
+      p_value      = .data$p.value
+    )
 }
 
 rppa_univariable_results <- purrr::map_dfr(
-   rppa_feature_cols,
-   fit_univariable_rppa
+  rppa_feature_cols,
+  fit_univariable_rppa
 ) |>
-   dplyr::mutate(
-      p_adjust_bh = stats::p.adjust(p_value, method = "BH"),
-      abs_log_hr  = abs(log(hazard_ratio))
-   ) |>
-   dplyr::arrange(
-      p_adjust_bh,
-      dplyr::desc(abs_log_hr)
-   )
+  dplyr::mutate(
+    p_adjust_bh = stats::p.adjust(.data$p_value, method = "BH"),
+    abs_log_hr  = abs(log(.data$hazard_ratio))
+  ) |>
+  dplyr::arrange(
+    .data$p_adjust_bh,
+    dplyr::desc(.data$abs_log_hr)
+  )
 
 abort_if_false(
-   nrow(rppa_univariable_results) > 0,
-   "RPPA univariable screening did not produce any valid Cox models."
+  nrow(rppa_univariable_results) > 0,
+  "RPPA univariable screening did not produce any valid Cox models."
 )
 
 # Select top features that survive FDR correction (BH-adjusted p < 0.05),
@@ -177,22 +178,22 @@ abort_if_false(
 n_selected_rppa <- 10L
 
 selected_rppa_features <- rppa_univariable_results |>
-   dplyr::filter(p_adjust_bh < 0.05) |>
-   dplyr::slice_head(n = n_selected_rppa) |>
-   dplyr::pull(feature)
+  dplyr::filter(.data$p_adjust_bh < 0.05) |>
+  dplyr::slice_head(n = n_selected_rppa) |>
+  dplyr::pull(.data$feature)
 
 if (length(selected_rppa_features) == 0) {
-   warning(
-      "No RPPA features passed the FDR threshold (BH-adjusted p < 0.05). ",
-      "Consider relaxing the threshold or reviewing data quality.",
-      call. = FALSE
-   )
+  warning(
+    "No RPPA features passed the FDR threshold (BH-adjusted p < 0.05). ",
+    "Consider relaxing the threshold or reviewing data quality.",
+    call. = FALSE
+  )
 } else if (length(selected_rppa_features) < n_selected_rppa) {
-   message(
-      "Fewer than ", n_selected_rppa,
-      " RPPA features passed the FDR threshold; ",
-      length(selected_rppa_features), " selected."
-   )
+  message(
+    "Fewer than ", n_selected_rppa,
+    " RPPA features passed the FDR threshold; ",
+    length(selected_rppa_features), " selected."
+  )
 }
 
 selected_mutation_features <- mutation_feature_cols
@@ -201,33 +202,35 @@ selected_mutation_features <- mutation_feature_cols
 # Write outputs ---------------------------------------------------------------
 
 readr::write_csv(
-   rppa_univariable_results,
-   "results/rppa_univariable_cox_results.csv"
+  rppa_univariable_results,
+  "results/rppa_univariable_cox_results.csv"
 )
 
 readr::write_csv(
-   rppa_univariable_results |>
-      dplyr::filter(feature %in% selected_rppa_features) |>
-      dplyr::select(
-         feature,
-         hazard_ratio,
-         conf_low,
-         conf_high,
-         p_value,
-         p_adjust_bh
-      ),
-   "results/selected_rppa_features.csv"
+  rppa_univariable_results |>
+    dplyr::filter(.data$feature %in% selected_rppa_features) |>
+    dplyr::select(
+      dplyr::all_of(c(
+        "feature",
+        "hazard_ratio",
+        "conf_low",
+        "conf_high",
+        "p_value",
+        "p_adjust_bh"
+      ))
+    ),
+  "results/selected_rppa_features.csv"
 )
 
 readr::write_csv(
-   tibble::tibble(feature = selected_mutation_features),
-   "results/selected_mutation_features.csv"
+  tibble::tibble(feature = selected_mutation_features),
+  "results/selected_mutation_features.csv"
 )
 
 message(
-   "RPPA feature selection complete: selected ",
-   length(selected_rppa_features), " of ",
-   length(rppa_feature_cols), " usable RPPA features."
+  "RPPA feature selection complete: selected ",
+  length(selected_rppa_features), " of ",
+  length(rppa_feature_cols), " usable RPPA features."
 )
 
 message("Selected RPPA features:")

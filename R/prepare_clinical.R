@@ -35,25 +35,24 @@
 # Usage: this script is intended to be sourced by run_analysis.R as part of
 #        the full pipeline, not run directly.
 
-
 # Validate join keys -----------------------------------------------------------
 # Only the join keys are checked here. All other required columns are validated
 # against clinical_data after the join, since column provenance (patient vs
 # sample table) varies by study.
 
 if (!"PATIENT_ID" %in% names(clinical_patient)) {
-   stop(
-      "clinical_patient is missing required join key: PATIENT_ID",
-      call. = FALSE
-   )
+  stop(
+    "clinical_patient is missing required join key: PATIENT_ID",
+    call. = FALSE
+  )
 }
 
 if (!all(c("PATIENT_ID", "SAMPLE_ID") %in% names(clinical_sample))) {
-   stop(
-      "clinical_sample is missing required join key(s): ",
-      "PATIENT_ID and/or SAMPLE_ID",
-      call. = FALSE
-   )
+  stop(
+    "clinical_sample is missing required join key(s): ",
+    "PATIENT_ID and/or SAMPLE_ID",
+    call. = FALSE
+  )
 }
 
 # Combine patient-level and sample-level clinical data -------------------------
@@ -64,7 +63,7 @@ if (!all(c("PATIENT_ID", "SAMPLE_ID") %in% names(clinical_sample))) {
 n_samples_before <- nrow(clinical_sample)
 
 clinical_data <- clinical_sample |>
-   dplyr::left_join(clinical_patient, by = "PATIENT_ID")
+  dplyr::left_join(clinical_patient, by = "PATIENT_ID")
 
 # Warn if the join changed the row count. That would suggest duplicate
 # PATIENT_ID values in clinical_patient, because multiple samples per patient
@@ -72,13 +71,13 @@ clinical_data <- clinical_sample |>
 # the number of rows in this join.
 
 if (nrow(clinical_data) != n_samples_before) {
-   warning(
-      "Row count changed after join: ",
-      n_samples_before, " sample rows -> ",
-      nrow(clinical_data), " joined rows. ",
-      "This suggests PATIENT_ID may not be unique in clinical_patient.",
-      call. = FALSE
-   )
+  warning(
+    "Row count changed after join: ",
+    n_samples_before, " sample rows -> ",
+    nrow(clinical_data), " joined rows. ",
+    "This suggests PATIENT_ID may not be unique in clinical_patient.",
+    call. = FALSE
+  )
 }
 
 # Validate all columns needed for transmute against the joined table.
@@ -86,30 +85,30 @@ if (nrow(clinical_data) != n_samples_before) {
 # source table.
 
 required_cols <- c(
-   "PATIENT_ID",
-   "SAMPLE_ID",
-   "OS_MONTHS",
-   "OS_STATUS",
-   "AGE",
-   "SEX",
-   "AJCC_PATHOLOGIC_TUMOR_STAGE",
-   "GRADE"
+  "PATIENT_ID",
+  "SAMPLE_ID",
+  "OS_MONTHS",
+  "OS_STATUS",
+  "AGE",
+  "SEX",
+  "AJCC_PATHOLOGIC_TUMOR_STAGE",
+  "GRADE"
 )
 
 missing_cols <- setdiff(required_cols, names(clinical_data))
 
 if (length(missing_cols) > 0) {
-   stop(
-      "Joined clinical_data is missing expected column(s): ",
-      paste(missing_cols, collapse = ", "),
-      call. = FALSE
-   )
+  stop(
+    "Joined clinical_data is missing expected column(s): ",
+    paste(missing_cols, collapse = ", "),
+    call. = FALSE
+  )
 }
 
 message(
-   "Joined clinical tables: ",
-   nrow(clinical_data), " rows x ",
-   ncol(clinical_data), " cols."
+  "Joined clinical tables: ",
+  nrow(clinical_data), " rows x ",
+  ncol(clinical_data), " cols."
 )
 
 # Prepare clinical survival table ----------------------------------------------
@@ -124,85 +123,85 @@ grade_levels <- c("G1", "G2", "G3", "G4")
 # problematic strings rather than just a post-hoc count of NAs.
 
 unexpected_stages <- setdiff(
-   unique(stats::na.omit(clinical_data$AJCC_PATHOLOGIC_TUMOR_STAGE)),
-   stage_levels
+  unique(stats::na.omit(clinical_data$AJCC_PATHOLOGIC_TUMOR_STAGE)),
+  stage_levels
 )
 
 unexpected_grades <- setdiff(
-   unique(stats::na.omit(clinical_data$GRADE)),
-   c(grade_levels, "GX")
+  unique(stats::na.omit(clinical_data$GRADE)),
+  c(grade_levels, "GX")
 )
 
 if (length(unexpected_stages) > 0) {
-   warning(
-      "Unexpected AJCC stage value(s) will be coerced to NA: ",
-      paste(unexpected_stages, collapse = ", "),
-      call. = FALSE
-   )
+  warning(
+    "Unexpected AJCC stage value(s) will be coerced to NA: ",
+    paste(unexpected_stages, collapse = ", "),
+    call. = FALSE
+  )
 }
 
 if (length(unexpected_grades) > 0) {
-   warning(
-      "Unexpected GRADE value(s) will be coerced to NA: ",
-      paste(unexpected_grades, collapse = ", "),
-      call. = FALSE
-   )
+  warning(
+    "Unexpected GRADE value(s) will be coerced to NA: ",
+    paste(unexpected_grades, collapse = ", "),
+    call. = FALSE
+  )
 }
 
 n_before_filter <- nrow(clinical_data)
 
 clinical_survival <- clinical_data |>
-   dplyr::transmute(
-      patient_id = .data$PATIENT_ID,
-      sample_id  = .data$SAMPLE_ID,
-      os_months  = as.numeric(.data$OS_MONTHS),
-      os_event   = dplyr::case_when(
-         is.na(.data$OS_STATUS) ~ NA_integer_,
-         stringr::str_detect(
-            .data$OS_STATUS,
-            stringr::regex("DECEASED", ignore_case = TRUE)
-         ) ~ 1L,
-         stringr::str_detect(
-            .data$OS_STATUS,
-            stringr::regex("LIVING", ignore_case = TRUE)
-         ) ~ 0L,
-         TRUE ~ NA_integer_
-      ),
-      age = as.numeric(.data$AGE),
-      sex = factor(.data$SEX),
-      stage = factor(
-         .data$AJCC_PATHOLOGIC_TUMOR_STAGE,
-         levels  = stage_levels,
-         ordered = TRUE
-      ),
-      grade = factor(
-         dplyr::if_else(.data$GRADE == "GX", NA_character_, .data$GRADE),
-         levels  = grade_levels,
-         ordered = TRUE
-      )
-   ) |>
-   dplyr::filter(
-      !is.na(.data$os_months),
-      !is.na(.data$os_event)
-   )
+  dplyr::transmute(
+    patient_id = .data$PATIENT_ID,
+    sample_id = .data$SAMPLE_ID,
+    os_months = as.numeric(.data$OS_MONTHS),
+    os_event = dplyr::case_when(
+      is.na(.data$OS_STATUS) ~ NA_integer_,
+      stringr::str_detect(
+        .data$OS_STATUS,
+        stringr::regex("DECEASED", ignore_case = TRUE)
+      ) ~ 1L,
+      stringr::str_detect(
+        .data$OS_STATUS,
+        stringr::regex("LIVING", ignore_case = TRUE)
+      ) ~ 0L,
+      TRUE ~ NA_integer_
+    ),
+    age = as.numeric(.data$AGE),
+    sex = factor(.data$SEX),
+    stage = factor(
+      .data$AJCC_PATHOLOGIC_TUMOR_STAGE,
+      levels  = stage_levels,
+      ordered = TRUE
+    ),
+    grade = factor(
+      dplyr::if_else(.data$GRADE == "GX", NA_character_, .data$GRADE),
+      levels = grade_levels,
+      ordered = TRUE
+    )
+  ) |>
+  dplyr::filter(
+    !is.na(.data$os_months),
+    !is.na(.data$os_event)
+  )
 
 n_dropped <- n_before_filter - nrow(clinical_survival)
 
 message(
-   "Removed ",
-   n_dropped,
-   " record(s) with missing os_months or os_event."
+  "Removed ",
+  n_dropped,
+  " record(s) with missing os_months or os_event."
 )
 
 # Summarise available survival data -------------------------------------------
 
 clinical_survival_summary <- clinical_survival |>
-   dplyr::summarise(
-      patients                = dplyr::n_distinct(patient_id),
-      samples                 = dplyr::n_distinct(sample_id),
-      events                  = sum(os_event),
-      median_follow_up_months = median(os_months, na.rm = TRUE)
-   )
+  dplyr::summarise(
+    patients                = dplyr::n_distinct(patient_id),
+    samples                 = dplyr::n_distinct(sample_id),
+    events                  = sum(os_event),
+    median_follow_up_months = median(os_months, na.rm = TRUE)
+  )
 
 message("Clinical survival table prepared.")
 print(clinical_survival_summary)

@@ -1,286 +1,196 @@
-# survival_models.R ----------------------------------------------------------
+# Compare survival models -----------------------------------------------------
 #
-# Fits and compares clinical-only, mutation-only, RPPA-only, integrated Cox, and
-# optional penalised Cox models for TCGA KIRC overall survival. The goal is a
-# compact assignment-ready comparison of whether omics features add useful
-# survival signal beyond clinical covariates.
+# Fits and compares multiple multivariable Cox proportional hazards models to
+# evaluate the incremental prognostic value of adding omics data to standard
+# clinical risk factors:
+#   - Model 1: Clinical baseline (age + sex + stage + grade)
+#   - Model 2: Clinical + Top 10 screened RPPA features
+#   - Model 3: Clinical + RNA-seq pathway scores (PC1 scores)
+#   - Model 4: Clinical + Curated binary mutation features
+#   - Model 5: Full integration (Clinical + RPPA + RNA + Mutation)
 #
-# Intended to be sourced by the pipeline; not run directly.
+# Computes concordance indices (C-index) with Wald 95 % confidence intervals,
+# compares nested models with Likelihood Ratio Tests (LRT), and calculates
+# Akaike Information Criterion (AIC) for non-nested comparison.
 #
-# Requires: feature_selection.R to have been sourced.
+# Requires: pathway_scores.R to have been sourced so that survival_data is
+#           available and contains the derived pathway score columns.
 #
 # Produces:
-#   model_comparison_results - C-index and sample/event counts for each model
-#   fitted_survival_models   - Named list of fitted Cox/glmnet model objects
-#   integrated_cox_results   - Hazard-ratio table for the integrated Cox model
+#   model_fits           - Named list containing the 5 coxph model objects.
+#   model_comparison_df  - Combined statistical summary table of all models.
 #
 # Outputs:
-#   results/model_comparison_results.csv
-#   results/integrated_cox_results.csv
-#   results/lasso_selected_features.csv, when LASSO is fitted
+#   results/model_comparison_metrics.csv
+#
+# Note: this script is intended to be sourced by run_analysis.R.
 
 
 # Validate inputs -------------------------------------------------------------
 
-check_required_objects(
-   c(
-      "survival_data",
-      "selected_rppa_features",
-      "selected_mutation_features"
-   )
+check_required_objects(c(
+  "survival_data",
+  "selected_rppa_features",
+  "selected_mutation_features"
+))
+
+# Build model formulae dynamically --------------------------------------------
+
+clinical_vars <- c("age", "sex", "stage", "grade")
+
+# Define the feature sets explicitly
+rppa_vars <- selected_rppa_features
+rna_vars <- c("score_neutrophil_deg", "score_ecm_deg", "score_ptk")
+mutation_vars <- selected_mutation_features
+
+# Combine variable groups into specific model definitions
+formula_specs <- list(
+  clinical   = clinical_vars,
+  rppa       = c(clinical_vars, rppa_vars),
+  rna        = c(clinical_vars, rna_vars),
+  mutation   = c(clinical_vars, mutation_vars),
+  integrated = c(clinical_vars, rppa_vars, rna_vars, mutation_vars)
 )
 
-check_has_columns(
-   "survival_data",
-   c("os_months", "os_event", "age", "sex", "stage", "grade")
+# Build formula objects cleanly by compiling string components and converting
+# them explicitly with as.formula to avoid syntax breakdowns.
+model_formulae <- purrr::map(
+  formula_specs,
+  function(vars) {
+    formula_str <- paste0(
+      "survival::Surv(os_months, os_event) ~ ",
+      paste(vars, collapse = " + ")
+    )
+    stats::as.formula(formula_str)
+  }
 )
 
-clinical_model_terms <- c("age", "sex", "stage", "grade")
+# Complete-case filter across all variables -----------------------------------
+# To make Likelihood Ratio Tests and metrics strictly comparable, all models
+# must be evaluated on identical samples.
 
-# Ensure selected features are present in survival_data; warn if any are lost.
-rppa_available <- intersect(selected_rppa_features, names(survival_data))
-if (length(rppa_available) < length(selected_rppa_features)) {
-   warning(
-      length(selected_rppa_features) - length(rppa_available),
-      " selected RPPA feature(s) not found in survival_data and will be dropped."
-   )
-}
-selected_rppa_features <- rppa_available
+all_modelling_vars <- c("os_months", "os_event", formula_specs$integrated)
 
-mut_available <- intersect(selected_mutation_features, names(survival_data))
-if (length(mut_available) < length(selected_mutation_features)) {
-   warning(
-      length(selected_mutation_features) - length(mut_available),
-      " selected mutation feature(s) not found in survival_data and will be dropped."
-   )
+modelling_data <- survival_data |>
+  dplyr::select(dplyr::all_of(all_modelling_vars)) |>
+  tidyr::drop_na()
+
+n_dropped_cc <- nrow(survival_data) - nrow(modelling_data)
+
+if (n_dropped_cc > 0) {
+  message(
+    n_dropped_cc,
+    " sample(s) dropped to establish a unified complete-case modelling set."
+  )
 }
-selected_mutation_features <- mut_available
 
 abort_if_false(
-   length(selected_rppa_features) > 0,
-   "No selected RPPA features are present in survival_data."
+  nrow(modelling_data) >= 30,
+  paste(
+    "Insufficient data for multivariable modeling after complete-case filter.",
+    "Required: >= 30 samples. Available: ", nrow(modelling_data)
+  )
 )
 
+message(
+  "unified complete-case analysis cohort: ",
+  nrow(modelling_data), " samples, ",
+  sum(modelling_data$os_event), " events."
+)
 
-# Helpers ---------------------------------------------------------------------
+# Fit models ------------------------------------------------------------------
 
-build_model_data <- function(feature_cols) {
-   survival_data |>
-      dplyr::select(
-         os_months,
-         os_event,
-         dplyr::all_of(feature_cols)
-      ) |>
-      tidyr::drop_na() |>
-      dplyr::mutate(
-         dplyr::across(
-            .cols = where(is.factor),
-            .fns = droplevels
-         )
+fit_cox_model <- function(formula_obj, model_name) {
+  fit <- tryCatch(
+    survival::coxph(
+      formula_obj,
+      data = modelling_data,
+      ties = "efron"
+    ),
+    error = function(e) {
+      stop(
+        "Cox model fitting failed for [", model_name, "]: ", e$message,
+        call. = FALSE
       )
+    }
+  )
+  fit
 }
 
-# Use reformulate() rather than paste()/as.formula() with backtick quoting,
-# which is fragile for feature names containing special characters.
-cox_formula_from_terms <- function(feature_cols) {
-   reformulate(
-      termlabels = feature_cols,
-      response = "survival::Surv(os_months, os_event)"
-   )
+model_fits <- purrr::imap(model_formulae, fit_cox_model)
+
+# Extract summary metrics -----------------------------------------------------
+
+extract_metrics <- function(fit, name) {
+  sum_fit <- summary(fit)
+
+  # Wald test for overall model significance
+  wald_p <- sum_fit$waldtest[["pvalue"]]
+
+  # Concordance index and standard error extracted safely by numeric position
+  # to handle variations in survival package label names.
+  c_index <- unname(sum_fit$concordance[1])
+  c_se <- unname(sum_fit$concordance[2])
+
+  # Compute 95 % Wald confidence limits for C-index
+  c_low <- max(0, c_index - (1.96 * c_se))
+  c_high <- min(1, c_index + (1.96 * c_se))
+
+  tibble::tibble(
+    model        = name,
+    n_coef       = length(fit$coefficients),
+    log_lik      = fit$loglik[2],
+    aic          = stats::AIC(fit),
+    c_index      = c_index,
+    c_conf_low   = c_low,
+    c_conf_high  = c_high,
+    wald_p_value = wald_p
+  )
 }
 
-fit_cox_model <- function(feature_cols, model_name) {
-   model_data <- build_model_data(feature_cols)
-   
-   if (nrow(model_data) < 30 || sum(model_data$os_event) < 5) {
-      warning(model_name, " skipped because it has too few complete cases/events.")
-      return(NULL)
-   }
-   
-   fit <- survival::coxph(
-      cox_formula_from_terms(feature_cols),
-      data = model_data,
-      ties = "efron",
-      x = TRUE
-   )
-   
-   fit_summary <- summary(fit)
-   
-   list(
-      fit = fit,
-      data = model_data,
-      summary = tibble::tibble(
-         model = model_name,
-         n = nrow(model_data),
-         events = sum(model_data$os_event),
-         predictors = length(feature_cols),
-         c_index = unname(fit_summary$concordance[1]),
-         c_index_se = unname(fit_summary$concordance[2]),
-         partial_aic = stats::extractAIC(fit)[2]
-      )
-   )
+metrics_df <- purrr::imap_dfr(model_fits, extract_metrics)
+
+# Statistical nested model comparisons (LRT) ----------------------------------
+# Likelihood Ratio Test evaluates whether an omics layer provides a
+# statistically significant improvement over the clinical baseline.
+
+compute_lrt_vs_clinical <- function(target_fit) {
+  lrt <- stats::anova(model_fits$clinical, target_fit)
+  # Extract p-value from the second row using the exact column mapping P(>|Chi|)
+  lrt[["P(>|Chi|)"]][2]
 }
 
-extract_cox_results <- function(fit) {
-   broom::tidy(
-      fit,
-      conf.int = TRUE,
-      exponentiate = TRUE
-   ) |>
-      dplyr::transmute(
-         term,
-         hazard_ratio = .data$estimate,
-         conf_low = .data$conf.low,
-         conf_high = .data$conf.high,
-         p_value = .data$p.value
-      ) |>
-      dplyr::arrange(.data$p_value)
-}
-
-
-# Fit interpretable Cox models ------------------------------------------------
-
-model_terms <- list(
-   clinical_only = clinical_model_terms,
-   mutation_only = selected_mutation_features,
-   rppa_only = selected_rppa_features,
-   integrated = c(
-      clinical_model_terms,
-      selected_rppa_features,
-      selected_mutation_features
-   )
+lrt_p_values <- c(
+  clinical   = NA_real_,
+  rppa       = compute_lrt_vs_clinical(model_fits$rppa),
+  rna        = compute_lrt_vs_clinical(model_fits$rna),
+  mutation   = compute_lrt_vs_clinical(model_fits$mutation),
+  integrated = compute_lrt_vs_clinical(model_fits$integrated)
 )
 
-# Mutation-only is skipped automatically if no mutation features are available.
-model_terms <- model_terms[lengths(model_terms) > 0]
+model_comparison_df <- metrics_df |>
+  dplyr::mutate(
+    lrt_p_value_vs_clinical = lrt_p_values[match(
+      .data$model,
+      names(lrt_p_values)
+    )]
+  ) |>
+  dplyr::arrange(.data$aic)
 
-fitted_survival_models <- purrr::imap(model_terms, fit_cox_model)
-fitted_survival_models <- fitted_survival_models[
-   !vapply(fitted_survival_models, is.null, logical(1))
-]
+# Save results ----------------------------------------------------------------
 
-abort_if_false(
-   length(fitted_survival_models) > 0,
-   "No Cox models could be fitted."
-)
-
-model_comparison_results <- purrr::map_dfr(
-   fitted_survival_models,
-   ~ .x$summary
-) |>
-   dplyr::arrange(dplyr::desc(.data$c_index))
-
-if ("integrated" %in% names(fitted_survival_models)) {
-   integrated_cox_results <- extract_cox_results(
-      fitted_survival_models$integrated$fit
-   )
-   readr::write_csv(
-      integrated_cox_results,
-      "results/integrated_cox_results.csv"
-   )
-} else {
-   integrated_cox_results <- tibble::tibble()
-}
-
-message("Model comparison results:")
-print(model_comparison_results)
-
-
-# Optional penalised Cox model ------------------------------------------------
-# LASSO is useful when the integrated feature count is large relative to events.
-# Fitted when enough complete cases and events exist for stable cross-validation.
-
-lasso_candidate_features <- c(
-   clinical_model_terms,
-   selected_rppa_features,
-   selected_mutation_features
-)
-
-lasso_data <- build_model_data(lasso_candidate_features)
-lasso_selected_features <- tibble::tibble()
-
-if (nrow(lasso_data) >= 50 && sum(lasso_data$os_event) >= 20) {
-   x_lasso <- stats::model.matrix(
-      cox_formula_from_terms(lasso_candidate_features),
-      data = lasso_data
-   )[, -1, drop = FALSE]
-   
-   y_lasso <- survival::Surv(
-      lasso_data$os_months,
-      lasso_data$os_event
-   )
-   
-   # Floor n_folds at 3 to avoid degenerate CV when event count is very low.
-   n_folds <- max(3L, min(10L, sum(lasso_data$os_event)))
-   
-   lasso_cv_fit <- glmnet::cv.glmnet(
-      x = x_lasso,
-      y = y_lasso,
-      family = "cox",
-      alpha = 1,
-      nfolds = n_folds,
-      standardize = TRUE,
-      cox.ties = "efron"
-   )
-   
-   lasso_coef <- as.matrix(stats::coef(lasso_cv_fit, s = "lambda.1se"))
-   
-   lasso_selected_features <- tibble::tibble(
-      feature = rownames(lasso_coef),
-      coefficient = as.numeric(lasso_coef[, 1])
-   ) |>
-      dplyr::filter(.data$coefficient != 0) |>
-      dplyr::arrange(dplyr::desc(abs(.data$coefficient)))
-   
-   lasso_lp <- as.numeric(
-      stats::predict(
-         lasso_cv_fit,
-         newx = x_lasso,
-         s = "lambda.1se",
-         type = "link"
-      )
-   )
-   
-   lasso_concordance <- survival::concordance(y_lasso ~ I(-lasso_lp))
-   
-   model_comparison_results <- model_comparison_results |>
-      dplyr::bind_rows(
-         tibble::tibble(
-            model = "lasso_integrated",
-            n = nrow(lasso_data),
-            events = sum(lasso_data$os_event),
-            predictors = ncol(x_lasso),
-            c_index = unname(lasso_concordance$concordance),
-            c_index_se = sqrt(unname(lasso_concordance$var)),
-            partial_aic = NA_real_
-         )
-      ) |>
-      dplyr::arrange(dplyr::desc(.data$c_index))
-   
-   fitted_survival_models$lasso_integrated <- list(
-      fit = lasso_cv_fit,
-      data = lasso_data,
-      selected_features = lasso_selected_features
-   )
-   
-   readr::write_csv(
-      lasso_selected_features,
-      "results/lasso_selected_features.csv"
-   )
-   
-   message("LASSO Cox model fitted with lambda.1se (", n_folds, " folds).")
-   message("LASSO-selected features:")
-   print(lasso_selected_features)
-} else {
-   readr::write_csv(
-      lasso_selected_features,
-      "results/lasso_selected_features.csv"
-   )
-   message("LASSO Cox model skipped: fewer than 50 complete cases or 20 events.")
-}
-
-# Write final model comparison table once, after LASSO results are appended.
 readr::write_csv(
-   model_comparison_results,
-   "results/model_comparison_results.csv"
+  model_comparison_df,
+  "results/model_comparison_metrics.csv"
+)
+
+# Print summary ---------------------------------------------------------------
+
+message("\nModel comparison summary (ordered by AIC):")
+print(model_comparison_df)
+
+best_model <- model_comparison_df$model[1]
+message(
+  "\nModel comparison complete. Best performing model by AIC: [",
+  best_model, "]"
 )
