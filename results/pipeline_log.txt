@@ -1,6 +1,11 @@
 ============================================================
-Pipeline run started: 2026-06-03 15:26:26.640546
+Pipeline run started: 2026-06-04 12:42:21.498132
 ============================================================
+------------------------------------------------------------
+Step: Helper functions for validation errors
+Script: R/utils_validation.R
+------------------------------------------------------------
+Completed Helper functions for validation errors in 0 ms.
 ------------------------------------------------------------
 Step: Package setup and configuration
 Script: R/setup.R
@@ -13,7 +18,7 @@ Script: R/setup.R
 
 [MESSAGE] Working study ID: kirc_tcga_pan_can_atlas_2018
 
-Completed Package setup and configuration in 0 s.
+Completed Package setup and configuration in 20 ms.
 ------------------------------------------------------------
 Step: Load raw cBioPortal data
 Script: R/load_data.R
@@ -33,7 +38,7 @@ Script: R/load_data.R
 [MESSAGE] 
 All data files loaded successfully.
 
-Completed Load raw cBioPortal data in 10 s.
+Completed Load raw cBioPortal data in 12.59 s.
 ------------------------------------------------------------
 Step: Prepare clinical survival table
 Script: R/prepare_clinical.R
@@ -44,7 +49,7 @@ Script: R/prepare_clinical.R
 
 [MESSAGE] Clinical survival table prepared.
 
-Completed Prepare clinical survival table in 0.1 s.
+Completed Prepare clinical survival table in 50 ms.
 ------------------------------------------------------------
 Step: Prepare RPPA proteomics data
 Script: R/prepare_rppa.R
@@ -53,7 +58,7 @@ Script: R/prepare_rppa.R
 
 [MESSAGE] RPPA proteomics table prepared: 455 samples x 198 features. 3.5% missing values.
 
-Completed Prepare RPPA proteomics data in 5.3 s.
+Completed Prepare RPPA proteomics data in 3.98 s.
 ------------------------------------------------------------
 Step: Prepare RNA-seq data
 Script: R/prepare_rnaseq.R
@@ -62,8 +67,7 @@ Script: R/prepare_rnaseq.R
 
 [MESSAGE] Input RNA-seq data: 20531 genes x 511 samples.
 
-[MESSAGE] 
-Fetching MSigDB gene sets ...
+[MESSAGE] Fetching MSigDB gene sets ...
 
 [MESSAGE] [neutrophil_degranulation] 2 gene sets; 13 genes
 
@@ -95,7 +99,7 @@ Genes available per query (after QC):
 [MESSAGE] 
 Total genes retained: 3923
 
-Completed Prepare RNA-seq data in 28.1 s.
+Completed Prepare RNA-seq data in 27.34 s.
 ------------------------------------------------------------
 Step: Prepare binary mutation features
 Script: R/prepare_mutations.R
@@ -104,24 +108,24 @@ Script: R/prepare_mutations.R
 
 [MESSAGE] Mutation feature table prepared: 275 samples x 9 driver gene features.
 
-Completed Prepare binary mutation features in 0.2 s.
+Completed Prepare binary mutation features in 310 ms.
 ------------------------------------------------------------
 Step: Integrate all data layers
 Script: R/integrate_data.R
 ------------------------------------------------------------
 [MESSAGE] 57 sample(s) in clinical_survival had no matching RPPA data and were dropped by the inner join.
 
-[MESSAGE] Clinical + RPPA: 455 rows x 206 cols.
+[MESSAGE] Clinical + RPPA: 455 samples x 206 features.
 
-[MESSAGE] 1 sample(s) dropped due to missing RNA-seq overlap.
+[MESSAGE] 1 sample(s) with clinical + RPPA data had no matching RNA-seq and were dropped by the RNA-seq inner join.
 
-[MESSAGE] After RNA integration: 454 samples | 4129 features
+[MESSAGE] Clinical + RPPA + RNA-seq: 454 samples x 4129 features.
 
-[MESSAGE] Clinical + RPPA + mutation: 454 rows x 4138 cols.
+[MESSAGE] Clinical + RPPA + RNA-seq + mutation: 454 samples x 4138 features.
 
 [MESSAGE] Integration complete. 454 samples ready for modelling. 204 sample(s) are wild-type for all selected driver genes.
 
-Completed Integrate all data layers in 1.2 s.
+Completed Integrate all data layers in 470 ms.
 ------------------------------------------------------------
 Step: Quick survival check
 Script: R/quick_survival_check.R
@@ -148,8 +152,52 @@ Script: R/quick_survival_check.R
 [36m•[38;5;232m [32mcolour[38;5;232m : [34m"Stage"[38;5;232m[39m
 [MESSAGE] Saved stage-stratified KM plot to figures/stage_kaplan_meier.png
 
-Completed Quick survival check in 4.6 s.
+Completed Quick survival check in 5.76 s.
 ------------------------------------------------------------
 Step: Screen RPPA for features
 Script: R/feature_selection.R
 ------------------------------------------------------------
+[MESSAGE] RPPA feature selection complete: selected 10 of 191 usable RPPA features.
+
+[MESSAGE] Selected RPPA features:
+
+Completed Screen RPPA for features in 8.44 s.
+------------------------------------------------------------
+Step: Calculate pathway scores
+Script: R/pathway_scores.R
+------------------------------------------------------------
+[MESSAGE] Pathway scoring complete.
+
+[MESSAGE] Results saved to results/.
+
+[MESSAGE] Figures saved to figures/.
+
+[MESSAGE] Pathway scores appended to survival_data.
+
+Completed Calculate pathway scores in 5.22 s.
+------------------------------------------------------------
+Step: Compare survival models
+Script: R/survival_models.R
+------------------------------------------------------------
+[WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
+[WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
+[MESSAGE] Model comparison results:
+
+[MESSAGE] LASSO Cox model fitted with lambda.1se (10 folds).
+
+[MESSAGE] LASSO-selected features:
+
+Completed Compare survival models in 2.43 s.
+------------------------------------------------------------
+Step: Create report-ready outputs
+Script: R/results_figures.R
+------------------------------------------------------------
+[MESSAGE] [38;5;232mIgnoring unknown labels:
+[36m•[38;5;232m [32mcolour[38;5;232m : [34m"GAB2_GAB2"[38;5;232m[39m
+[MESSAGE] Report-ready figures and key findings saved.
+
+Completed Create report-ready outputs in 3.56 s.
+============================================================
+Pipeline complete. Total time: 70.5 s.
+============================================================
+Session info written to results/session_info.txt

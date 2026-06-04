@@ -6,7 +6,8 @@ Matrix products: default
   LAPACK version 3.12.1
 
 locale:
-[1] LC_COLLATE=English_Ireland.utf8  LC_CTYPE=English_Ireland.utf8    LC_MONETARY=English_Ireland.utf8 LC_NUMERIC=C                    
+[1] LC_COLLATE=English_Ireland.utf8  LC_CTYPE=English_Ireland.utf8   
+[3] LC_MONETARY=English_Ireland.utf8 LC_NUMERIC=C                    
 [5] LC_TIME=English_Ireland.utf8    
 
 time zone: Europe/Dublin
@@ -16,16 +17,23 @@ attached base packages:
 [1] stats     graphics  grDevices utils     datasets  methods   base     
 
 other attached packages:
- [1] msigdbr_26.1.0  broom_1.0.13    glmnet_5.0      Matrix_1.7-5    survminer_0.5.2 survival_3.8-6  markdown_2.0    car_3.1-5       carData_3.0-6   ggpubr_0.6.3   
-[11] lubridate_1.9.5 forcats_1.0.1   stringr_1.6.0   dplyr_1.2.1     purrr_1.2.2     readr_2.2.0     tidyr_1.3.2     tibble_3.3.1    ggplot2_4.0.3   tidyverse_2.0.0
+ [1] msigdbr_26.1.0  broom_1.0.13    glmnet_5.0      Matrix_1.7-5    survminer_0.5.2
+ [6] survival_3.8-6  markdown_2.0    car_3.1-5       carData_3.0-6   ggpubr_0.6.3   
+[11] lubridate_1.9.5 forcats_1.0.1   stringr_1.6.0   dplyr_1.2.1     purrr_1.2.2    
+[16] readr_2.2.0     tidyr_1.3.2     tibble_3.3.1    ggplot2_4.0.3   tidyverse_2.0.0
 [21] here_1.0.2     
 
 loaded via a namespace (and not attached):
- [1] gtable_0.3.6       babelgene_22.9     shape_1.4.6.1      xfun_0.57          rstatix_0.7.3      lattice_0.22-9     tzdb_0.5.0         vctrs_0.7.3       
- [9] tools_4.6.0        generics_0.1.4     parallel_4.6.0     curl_7.1.0         pkgconfig_2.0.3    RColorBrewer_1.1-3 S7_0.2.2           assertthat_0.2.1  
-[17] lifecycle_1.0.5    compiler_4.6.0     farver_2.1.2       textshaping_1.0.5  codetools_0.2-20   litedown_0.9       Formula_1.2-5      crayon_1.5.3      
-[25] pillar_1.11.1      iterators_1.0.14   abind_1.4-8        foreach_1.5.2      commonmark_2.0.0   tidyselect_1.2.1   stringi_1.8.7      labeling_0.4.3    
-[33] splines_4.6.0      rprojroot_2.1.1    grid_4.6.0         cli_3.6.6          magrittr_2.0.5     utf8_1.2.6         withr_3.0.2        scales_1.4.0      
-[41] backports_1.5.1    bit64_4.8.2        timechange_0.4.0   ggtext_0.1.2       bit_4.6.0          gridExtra_2.3      ggsignif_0.6.4     ragg_1.5.2        
-[49] hms_1.1.4          rlang_1.2.0        gridtext_0.1.6     Rcpp_1.1.1-1.1     glue_1.8.1         xml2_1.5.2         rstudioapi_0.18.0  vroom_1.7.1       
-[57] R6_2.6.1           systemfonts_1.3.2 
+ [1] tidyselect_1.2.1   farver_2.1.2       S7_0.2.2           timechange_0.4.0   lifecycle_1.0.5   
+ [6] ellmer_0.4.1       magrittr_2.0.5     compiler_4.6.0     rlang_1.2.0        tools_4.6.0       
+[11] utf8_1.2.6         ggsignif_0.6.4     labeling_0.4.3     bit_4.6.0          curl_7.1.0        
+[16] xml2_1.5.2         RColorBrewer_1.1-3 abind_1.4-8        babelgene_22.9     withr_3.0.2       
+[21] grid_4.6.0         scales_1.4.0       iterators_1.0.14   cli_3.6.6          crayon_1.5.3      
+[26] ragg_1.5.2         generics_0.1.4     otel_0.2.0         rstudioapi_0.18.0  tzdb_0.5.0        
+[31] commonmark_2.0.0   splines_4.6.0      assertthat_0.2.1   parallel_4.6.0     coro_1.1.0        
+[36] vctrs_0.7.3        litedown_0.9       hms_1.1.4          bit64_4.8.2        rstatix_0.7.3     
+[41] Formula_1.2-5      systemfonts_1.3.2  foreach_1.5.2      glue_1.8.1         codetools_0.2-20  
+[46] ggtext_0.1.2       stringi_1.8.7      shape_1.4.6.1      gtable_0.3.6       pillar_1.11.1     
+[51] rappdirs_0.3.4     R6_2.6.1           httr2_1.2.2        textshaping_1.0.5  rprojroot_2.1.1   
+[56] vroom_1.7.1        lattice_0.22-9     backports_1.5.1    gridtext_0.1.6     Rcpp_1.1.1-1.1    
+[61] gridExtra_2.3      xfun_0.57          pkgconfig_2.0.3   

@@ -1,8 +1,8 @@
 item,value
 analysis_samples,454
 analysis_events,158
-top_rppa_feature,rna_COL7A1
-top_rppa_hazard_ratio,1.316
-top_rppa_p_adjust_bh,7.8e-15
+top_rppa_feature,GAB2_GAB2
+top_rppa_hazard_ratio,0.54
+top_rppa_p_adjust_bh,3.2e-08
 best_model,integrated
-best_model_c_index,0.823
+best_model_c_index,0.812
