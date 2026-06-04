@@ -61,6 +61,17 @@ log_message <- function(...) {
    )
 }
 
+# Time-formatting helper -------------------------------------------------------
+# Report sub-second runtimes in milliseconds so fast steps do not appear as 0 s.
+
+format_elapsed_time <- function(time_seconds) {
+   if (time_seconds < 1) {
+      paste0(round(time_seconds * 1000, 1), " ms")
+   } else {
+      paste0(round(time_seconds, 2), " s")
+   }
+}
+
 # Pipeline step definitions ----------------------------------------------------
 # Store the pipeline order in one place so it is easy to edit later without
 # renaming files.
@@ -160,8 +171,15 @@ source_step <- function(path, step_name) {
       }
    )
    
-   elapsed <- round((proc.time() - t_start)[["elapsed"]], 1)
-   log_message("Completed ", step_name, " in ", elapsed, " s.")
+   elapsed <- unname((proc.time() - t_start)[["elapsed"]])
+   
+   log_message(
+      "Completed ",
+      step_name,
+      " in ",
+      format_elapsed_time(elapsed),
+      "."
+   )
 }
 
 # Run pipeline -----------------------------------------------------------------
@@ -176,7 +194,7 @@ for (i in seq_len(nrow(pipeline_steps))) {
    )
 }
 
-total_elapsed <- round((proc.time() - t_pipeline_start)[["elapsed"]], 1)
+total_elapsed <- unname((proc.time() - t_pipeline_start)[["elapsed"]])
 
 # Save session information -----------------------------------------------------
 # Save R version, platform, and loaded package versions for reproducibility.
@@ -189,6 +207,10 @@ writeLines(
 )
 
 log_message(strrep("=", 60))
-log_message("Pipeline complete. Total time: ", total_elapsed, " s.")
+log_message(
+   "Pipeline complete. Total time: ",
+   format_elapsed_time(total_elapsed),
+   "."
+)
 log_message(strrep("=", 60))
 log_message("Session info written to ", session_info_path)
