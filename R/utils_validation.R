@@ -144,3 +144,12 @@ save_pipeline_plot <- function(plot_object, file_path, width, height, resolution
    # Print the plot a second time to send it to the RStudio Plots pane
    print(plot_object)
 }
+
+# Standardise TCGA sample barcodes to a uniform 15-character hyphenated format
+# (e.g., converts 'TCGA.KL.8323.01A' or 'TCGA-KL-8323-01A-11D' to 'TCGA-KL-8323-01')
+standardise_sample_id <- function(ids) {
+   ids_clean <- as.character(ids)
+   ids_clean <- stringr::str_replace_all(ids_clean, "\\.", "-")
+   ids_clean <- stringr::str_sub(ids_clean, start = 1L, end = 15L)
+   ids_clean
+}

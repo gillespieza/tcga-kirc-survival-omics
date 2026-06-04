@@ -84,7 +84,7 @@ driver_genes <- c(
 # mutated (1); all other driver genes are coded as not mutated (0).
 mutation_long <- mutation_data |>
   dplyr::transmute(
-    sample_id   = .data$Tumor_Sample_Barcode,
+    sample_id   = standardise_sample_id(.data$Tumor_Sample_Barcode),
     gene_symbol = .data$Hugo_Symbol
   ) |>
   dplyr::filter(.data$gene_symbol %in% driver_genes) |>

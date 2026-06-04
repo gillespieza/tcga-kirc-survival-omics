@@ -1,5 +1,5 @@
 ============================================================
-Pipeline run started: 2026-06-04 18:10:33.520677
+Pipeline run started: 2026-06-04 18:33:42.189087
 ============================================================
 ------------------------------------------------------------
 Step: Validation error helper functions
@@ -20,7 +20,7 @@ Script: R/setup.R
 
 [MESSAGE] Working study ID: kirc_tcga_pan_can_atlas_2018
 
-Completed Package setup and configuration in 50 ms.
+Completed Package setup and configuration in 90 ms.
 ------------------------------------------------------------
 Step: Load raw cBioPortal data
 Script: R/load_data.R
@@ -39,7 +39,7 @@ Script: R/load_data.R
 
 [MESSAGE] All data files loaded successfully.
 
-Completed Load raw cBioPortal data in 10.59 s.
+Completed Load raw cBioPortal data in 10.39 s.
 ------------------------------------------------------------
 Step: Prepare clinical survival table
 Script: R/prepare_clinical.R
@@ -50,7 +50,7 @@ Script: R/prepare_clinical.R
 
 [MESSAGE] Clinical survival table prepared.
 
-Completed Prepare clinical survival table in 60 ms.
+Completed Prepare clinical survival table in 150 ms.
 ------------------------------------------------------------
 Step: Prepare RPPA proteomics data
 Script: R/prepare_rppa.R
@@ -59,7 +59,7 @@ Script: R/prepare_rppa.R
 
 [MESSAGE] RPPA proteomics table prepared: 455 samples x 198 features. 3.5% missing values.
 
-Completed Prepare RPPA proteomics data in 2.98 s.
+Completed Prepare RPPA proteomics data in 3.09 s.
 ------------------------------------------------------------
 Step: Prepare RNA-seq data
 Script: R/prepare_rnaseq.R
@@ -96,7 +96,7 @@ Script: R/prepare_rnaseq.R
 
 [MESSAGE] Total genes retained: 3923
 
-Completed Prepare RNA-seq data in 27.25 s.
+Completed Prepare RNA-seq data in 26.11 s.
 ------------------------------------------------------------
 Step: Prepare binary mutation features
 Script: R/prepare_mutations.R
@@ -105,7 +105,7 @@ Script: R/prepare_mutations.R
 
 [MESSAGE] Mutation feature table prepared: 275 samples x 9 driver gene features.
 
-Completed Prepare binary mutation features in 100 ms.
+Completed Prepare binary mutation features in 200 ms.
 ------------------------------------------------------------
 Step: Prepare binary CNA features
 Script: R/prepare_cna.R
@@ -114,7 +114,7 @@ Script: R/prepare_cna.R
 
 [MESSAGE] CNA feature table prepared: 509 samples x 4 features passed screening.
 
-Completed Prepare binary CNA features in 480 ms.
+Completed Prepare binary CNA features in 100 ms.
 ------------------------------------------------------------
 Step: Integrate all data layers
 Script: R/integrate_data.R
@@ -125,7 +125,7 @@ Script: R/integrate_data.R
 
 [MESSAGE] Integration complete. 454 samples fully combined into multi-omics workspace.
 
-Completed Integrate all data layers in 700 ms.
+Completed Integrate all data layers in 590 ms.
 ------------------------------------------------------------
 Step: Quick survival check
 Script: R/quick_survival_check.R
@@ -156,16 +156,17 @@ Script: R/quick_survival_check.R
 [36m•[38;5;232m [32mcolour[38;5;232m : [34m"Stage"[38;5;232m[39m
 [MESSAGE] Saved stage-stratified KM plot to figures/stage_kaplan_meier.png
 
-Completed Quick survival check in 8.67 s.
+Completed Quick survival check in 7.68 s.
 ------------------------------------------------------------
 Step: Screen RPPA for features
 Script: R/feature_selection.R
 ------------------------------------------------------------
-[MESSAGE] RPPA feature selection complete: selected 10 of 195 usable RPPA features.
+[MESSAGE] Fitting cross-validated multivariable LASSO Cox model...
 
-[MESSAGE] Selected RPPA features:
+[WARNING] Screen RPPA for features: LASSO shrunk all protein coefficients to zero. Reverting to minimum lambda target.
+[MESSAGE] RPPA feature selection complete: LASSO isolated 0 robust prognostic protein markers.
 
-Completed Screen RPPA for features in 8.11 s.
+Completed Screen RPPA for features in 1.8 s.
 ------------------------------------------------------------
 Step: Calculate pathway scores
 Script: R/pathway_scores.R
@@ -178,43 +179,56 @@ Script: R/pathway_scores.R
 
 [MESSAGE] Pathway scores appended to survival_data.
 
-Completed Calculate pathway scores in 6.77 s.
+Completed Calculate pathway scores in 6.48 s.
 ------------------------------------------------------------
 Step: Compare survival models
 Script: R/survival_models.R
 ------------------------------------------------------------
-[MESSAGE] 143 sample(s) dropped to establish a unified complete-case dataset.
+[MESSAGE] 165 sample(s) dropped to establish a unified complete-case dataset.
 
-[MESSAGE] 4 sample(s) dropped to establish a unified complete-case modelling set.
+[MESSAGE] Executing 5-fold cross-validation loop with embedded feature selection...
 
-[MESSAGE] unified complete-case analysis cohort: 311 samples, 87 events.
+[MESSAGE]   Processing fold 1 of 5...
+
+[WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
+[WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
+[WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
+[WARNING] Compare survival models: Loglik converged before variable  6,7,8,10,11,12 ; coefficient may be infinite. 
+[MESSAGE]   Processing fold 2 of 5...
+
+[WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
+[WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
+[WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
+[WARNING] Compare survival models: Loglik converged before variable  6,7,8,10,11,12 ; coefficient may be infinite. 
+[MESSAGE]   Processing fold 3 of 5...
 
 [WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
 [WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
 [WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
 [WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
+[MESSAGE]   Processing fold 4 of 5...
+
 [WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
+[WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
+[WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
+[WARNING] Compare survival models: Loglik converged before variable  6,7,8,9,10,11,12 ; coefficient may be infinite. 
+[MESSAGE]   Processing fold 5 of 5...
+
+[WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
+[WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
+[WARNING] Compare survival models: Loglik converged before variable  6,7,8 ; coefficient may be infinite. 
+[WARNING] Compare survival models: Loglik converged before variable  6,7,8,10,11,12 ; coefficient may be infinite. 
+[MESSAGE] Fitting final integrated model on full cohort for hazard ratio extraction...
+
+[WARNING] Compare survival models: Loglik converged before variable  6,7,8,19,20,21 ; coefficient may be infinite. 
 [MESSAGE] 
-Model comparison summary (ordered by AIC):
+Cross-validated model comparison summary (leak-free C-indices):
 
-[MESSAGE] 
-Model comparison complete. Best performing model by AIC: [integrated]
-
-Completed Compare survival models in 800 ms.
+Completed Compare survival models in 7.78 s.
 ------------------------------------------------------------
 Step: Create report-ready outputs
 Script: R/results_figures.R
 ------------------------------------------------------------
-[MESSAGE] [38;5;232m`height` was translated to `width`.[39m
-[MESSAGE] [38;5;232m`height` was translated to `width`.[39m
-[MESSAGE] Final performance visualization saved successfully.
-
-[MESSAGE] Plot location: figures/model_c_index_comparison.png
-
-[MESSAGE] Pipeline figure output complete.
-
-Completed Create report-ready outputs in 1.2 s.
-============================================================
-Pipeline complete. Total time: 68.29 s.
-============================================================
-Session info written to results/session_info.txt
+Pipeline failed at step: Create report-ready outputs
+Script: R/results_figures.R
+Error: model_comparison_df is missing required column(s): aic

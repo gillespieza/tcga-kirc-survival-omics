@@ -67,6 +67,10 @@ cna_long <- cna_data |>
       names_to  = "sample_id",
       values_to = "cna_status"
    ) |>
+   # Standardise the newly created sample_id strings to hyphenated formats
+   dplyr::mutate(
+      sample_id = standardise_sample_id(.data$sample_id)
+   ) |>
    tidyr::drop_na(.data$cna_status)
 
 

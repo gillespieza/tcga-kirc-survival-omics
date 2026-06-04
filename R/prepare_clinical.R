@@ -153,7 +153,7 @@ n_before_filter <- nrow(clinical_data)
 clinical_survival <- clinical_data |>
   dplyr::transmute(
     patient_id = .data$PATIENT_ID,
-    sample_id = .data$SAMPLE_ID,
+    sample_id  = standardise_sample_id(.data$SAMPLE_ID),
     os_months = as.numeric(.data$OS_MONTHS),
     os_event = dplyr::case_when(
       is.na(.data$OS_STATUS) ~ NA_integer_,

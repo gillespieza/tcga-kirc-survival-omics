@@ -2,12 +2,7 @@
 #
 # Combines the prepared clinical survival, RPPA proteomics, RNA-seq, binary
 # mutation, and copy-number alteration tables into a single analysis-ready tibble.
-#
-# Order of integration:
-#   1. Inner join clinical_survival with rppa_proteomics on sample_id.
-#   2. Inner join that result with rnaseq_expression on sample_id.
-#   3. Left join mutation_features on sample_id (handle missing entries safely).
-#   4. Left join cna_features on sample_id (handle missing entries safely).
+# Standardises all sample keys to ensure perfect multi-omics cross-matching.
 #
 # Requires: prepare_clinical.R, prepare_rppa.R, prepare_rnaseq.R,
 #           prepare_mutations.R, and prepare_cna.R to have been sourced.
@@ -46,8 +41,6 @@ clinical_rppa <- clinical_survival |>
 
 
 # 2. Integrate RNA-seq --------------------------------------------------------
-# RNA-seq is high-dimensional and may have slightly different sample coverage.
-# We restrict to the intersection of clinical + RPPA + RNA-seq samples.
 
 clinical_rppa_rna <- clinical_rppa |>
    dplyr::inner_join(
@@ -68,34 +61,27 @@ if (n_dropped_rna > 0) {
    )
 }
 
-message(
-   "Clinical + RPPA + RNA-seq: ",
-   nrow(clinical_rppa_rna), " samples x ",
-   ncol(clinical_rppa_rna), " features."
-)
-
 
 # 3. Integrate mutation features ----------------------------------------------
 # Missing values are only treated as wild-type (0) if the sample is confirmed 
 # to have undergone genomic sequencing.
 
-sequenced_sample_universe <- unique(mutation_data$Tumor_Sample_Barcode)
+sequenced_sample_universe <- standardise_sample_id(unique(mutation_data$Tumor_Sample_Barcode))
 
 clinical_rppa_rna_mutation <- clinical_rppa_rna |>
    dplyr::left_join(
       mutation_features,
       by = "sample_id"
-   ) |>
+   )
+
+# Pre-calculate logical alignment vector to avoid across() scoping bugs
+is_sequenced <- clinical_rppa_rna_mutation$sample_id %in% sequenced_sample_universe
+
+clinical_rppa_rna_mutation <- clinical_rppa_rna_mutation |>
    dplyr::mutate(
       dplyr::across(
          dplyr::starts_with("mut_", ignore.case = FALSE),
-         function(x) {
-            dplyr::case_when(
-               !is.na(x) ~ x,
-               is.na(x) & .data$sample_id %in% sequenced_sample_universe ~ 0L,
-               TRUE ~ NA_integer_
-            )
-         }
+         ~ dplyr::if_else(is_sequenced & is.na(.x), 0L, .x)
       )
    )
 
@@ -104,23 +90,25 @@ clinical_rppa_rna_mutation <- clinical_rppa_rna |>
 # Missing values are only treated as unaltered (0) if the sample is confirmed
 # to have successfully undergone copy-number profiling.
 
-cna_sample_universe <- setdiff(names(cna_data), "Hugo_Symbol")
+cna_sample_universe <- standardise_sample_id(setdiff(
+   names(cna_data),
+   c("Hugo_Symbol", "Entrez_Gene_Id")
+))
 
 clinical_rppa_rna_mutation_cna <- clinical_rppa_rna_mutation |>
    dplyr::left_join(
       cna_features,
       by = "sample_id"
-   ) |>
+   )
+
+# Pre-calculate logical alignment vector to avoid across() scoping bugs
+is_cna_profiled <- clinical_rppa_rna_mutation_cna$sample_id %in% cna_sample_universe
+
+clinical_rppa_rna_mutation_cna <- clinical_rppa_rna_mutation_cna |>
    dplyr::mutate(
       dplyr::across(
          dplyr::starts_with("cna_", ignore.case = FALSE),
-         function(x) {
-            dplyr::case_when(
-               !is.na(x) ~ x,
-               is.na(x) & .data$sample_id %in% cna_sample_universe ~ 0L,
-               TRUE ~ NA_integer_
-            )
-         }
+         ~ dplyr::if_else(is_cna_profiled & is.na(.x), 0L, .x)
       )
    )
 
@@ -153,7 +141,7 @@ mutation_summary <- summarise_mutations(clinical_rppa_rna_mutation)
 message(
    "Integration complete. ",
    nrow(clinical_rppa_rna_mutation),
-   " samples fully combined into multi-omics workspace."
+   " samples fully combined into multi-omics workspace with zeroed wild-types."
 )
 
 print(mutation_summary)

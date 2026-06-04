@@ -66,33 +66,36 @@ if (length(duplicated_names) > 0) {
 # Convert RPPA from wide feature-by-sample to sample-by-feature:
 #   1. Pivot to long (one row per sample-feature combination).
 #   2. Parse Composite.Element.REF into gene_symbol | protein_feature.
-#   3. Sanitise feature names for use as column names.
-#   4. Pivot back to wide (one row per sample).
+#   3. Standardise the raw sample barcodes to 15-character hyphenated keys.
+#   4. Sanitise feature names for use as column names.
+#   5. Pivot back to wide (one row per sample).
 
 rppa_proteomics <- rppa_data |>
-  tidyr::pivot_longer(
-    cols      = -Composite.Element.REF,
-    names_to  = "sample_id",
-    values_to = "rppa_zscore"
-  ) |>
-  tidyr::separate(
-    Composite.Element.REF,
-    into   = c("gene_symbol", "protein_feature"),
-    sep    = "\\|",
-    remove = FALSE,
-    extra  = "merge",
-    fill   = "right"
-  ) |>
-  dplyr::mutate(
-    protein_feature_clean = Composite.Element.REF |>
-      stringr::str_replace_all("[^A-Za-z0-9]+", "_") |>
-      stringr::str_remove("_+$")
-  ) |>
-  dplyr::select(sample_id, protein_feature_clean, rppa_zscore) |>
-  tidyr::pivot_wider(
-    names_from  = protein_feature_clean,
-    values_from = rppa_zscore
-  )
+   tidyr::pivot_longer(
+      cols      = -Composite.Element.REF,
+      names_to  = "sample_id",
+      values_to = "rppa_zscore"
+   ) |>
+   tidyr::separate(
+      Composite.Element.REF,
+      into   = c("gene_symbol", "protein_feature"),
+      sep    = "\\|",
+      remove = FALSE,
+      extra  = "merge",
+      fill   = "right"
+   ) |>
+   dplyr::mutate(
+      # Clean and normalise sample identifiers to match the master key format
+      sample_id = standardise_sample_id(.data$sample_id),
+      protein_feature_clean = Composite.Element.REF |>
+         stringr::str_replace_all("[^A-Za-z0-9]+", "_") |>
+         stringr::str_remove("_+$")
+   ) |>
+   dplyr::select(sample_id, protein_feature_clean, rppa_zscore) |>
+   tidyr::pivot_wider(
+      names_from  = protein_feature_clean,
+      values_from = rppa_zscore
+   )
 
 # Validate output -------------------------------------------------------------
 

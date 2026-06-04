@@ -110,14 +110,14 @@ if (length(mutation_feature_cols) == 0) {
 # Multivariable LASSO Feature Selection ---------------------------------------
 #
 # Instead of biased univariable screening, we use a multivariable LASSO Cox 
-# model with internal 10-fold cross-validation. Clinical variables are included 
-# with a penalty factor of 0 so they are never shrunk out of the model, 
-# ensuring we select proteins that add prognostic value beyond clinical baseline.
+# model with internal 10-fold cross-validation. Clinical variables are given 
+# a tiny penalty factor of 0.001 to act as a ridge stabilizer, preventing 
+# C++ convergence failures due to separation while ensuring they are never 
+# regularised out of the model space.
 
 # Prepare design matrix (X) and survival outcome (Y)
-# All variables must be numeric for glmnet, so we convert factors to dummy variables.
-
-modelling_vars <- c(clinical_cols, rppa_feature_cols)
+clinical_vars <- c("age", "sex", "stage", "grade")
+modelling_vars <- c(clinical_vars, rppa_feature_cols)
 
 lasso_data <- survival_data |>
    dplyr::select(dplyr::all_of(c("os_months", "os_event", modelling_vars))) |>
@@ -127,26 +127,23 @@ lasso_data <- survival_data |>
 x_matrix <- stats::model.matrix(
    stats::as.formula(paste("~", paste(modelling_vars, collapse = " + "))),
    data = lasso_data
-)[, -1] # Removes the automatic intercept column (not used in Cox models)
+)[, -1]
 
-# Extract individual column names from the generated model matrix
 x_names <- colnames(x_matrix)
 
 # Map which columns belong to the proteomic features vs clinical variables
 rppa_indices <- which(x_names %in% rppa_feature_cols)
 clinical_indices <- which(!x_names %in% rppa_feature_cols)
 
-# Build the survival target object expected by glmnet
 y_surv <- survival::Surv(
    time  = lasso_data$os_months,
    event = lasso_data$os_event
 )
 
-# Set up penalty factors: 0 for baseline clinical features, 1 for RPPA proteins
+# Set up penalty factors: 0.001 to stabilize baseline clinical features, 1 for proteins
 penalty_vector <- rep(1, ncol(x_matrix))
-penalty_vector[clinical_indices] <- 0
+penalty_vector[clinical_indices] <- 0.001
 
-# Fit the cross-validated LASSO Cox model
 message("Fitting cross-validated multivariable LASSO Cox model...")
 
 lasso_cv_fit <- glmnet::cv.glmnet(
@@ -154,7 +151,8 @@ lasso_cv_fit <- glmnet::cv.glmnet(
    y              = y_surv,
    family         = "cox",
    penalty.factor = penalty_vector,
-   nfolds         = 10
+   nfolds         = 10,
+   cox.ties       = "efron"
 )
 
 # Extract coefficients at the optimal lambda value 

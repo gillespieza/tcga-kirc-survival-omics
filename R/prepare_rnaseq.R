@@ -175,17 +175,22 @@ rnaseq_filtered <- rnaseq_data |>
 message("Genes after deduplication: ", nrow(rnaseq_filtered))
 
 # Long format and transform ---------------------------------------------------
+# Reshapes the wide expression matrix into a long format, standardises the
+# raw sample barcodes to 15-character hyphenated keys, and applies log2
+# transformation with a 1-count pseudocount.
 
 rnaseq_long <- rnaseq_filtered |>
-  tidyr::pivot_longer(
-    cols = -dplyr::all_of("Hugo_Symbol"),
-    names_to = "sample_id",
-    values_to = "rsem"
-  ) |>
-  dplyr::mutate(
-    rsem = tidyr::replace_na(.data$rsem, 0),
-    log2_expr = log2(.data$rsem + 1)
-  )
+   tidyr::pivot_longer(
+      cols     = -dplyr::all_of("Hugo_Symbol"),
+      names_to = "sample_id",
+      values_to = "rsem"
+   ) |>
+   dplyr::mutate(
+      # Clean and normalise sample identifiers to match the master key format
+      sample_id = standardise_sample_id(.data$sample_id),
+      rsem      = tidyr::replace_na(.data$rsem, 0),
+      log2_expr = log2(.data$rsem + 1)
+   )
 
 # QC --------------------------------------------------------------------------
 
