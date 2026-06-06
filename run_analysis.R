@@ -184,12 +184,12 @@ source_step <- function(path, step_name) {
     ),
     message = function(m) {
       message_text <- conditionMessage(m)
-      
+
       # Suppress harmless internal ggplot2 aesthetic note pollution cleanly
       if (grepl("Ignoring unknown labels", message_text)) {
-         invokeRestart("muffleMessage")
+        invokeRestart("muffleMessage")
       }
-      
+
       cli::cli_text(paste0(
         cli::col_cyan("\u2139\ufe0f [MESSAGE] "),
         message_text
