@@ -1,105 +1,80 @@
-# Pathway score computation from RNA-seq expression ---------------------------
+# Pathway score computation & Data-Driven RNA Feature Selection ---------------
 #
-# Computes per-sample pathway activity scores for all 8 individual MSigDB
-# inflammatory and kinase signatures using:
-#   1. Mean log2 expression (interpretability baseline)
-#   2. PC1 score (primary modelling feature; captures co-expression structure)
-#
-# Also evaluates:
-#   - gene coverage per pathway
-#   - per-sample completeness
-#   - correlation with selected RPPA features (collinearity screening)
+# Engine 1 (Curated): Computes PC1 scores for all 8 individual MSigDB
+#                     signatures.
+# Engine 2 (Data-Driven): Conducts an unbiased univariable Cox screening
+#                         loop across ALL available RNA-seq genes, isolates
+#                         the top 20 by p-value, and computes a summary
+#                         PC1 score.
 #
 # Requires:
-#   rnaseq_expression          (prepare_rnaseq.R; sample_id + rna_* columns)
-#   rnaseq_gene_set_membership (prepare_rnaseq.R; query, gs_name, gene_symbol)
-#   selected_rppa_features     (feature_selection.R)
-#   rppa_proteomics            (prepare_rppa.R)
+#   rnaseq_expression          (sample_id + rna_* columns)
+#   rnaseq_gene_set_membership (query, gs_name, gene_symbol)
+#   survival_data              (initialized by quick_survival_check.R)
 #
 # Produces:
-#   pathway_score_results      - Per-sample RNA pathway scores for all 8 signatures
-#   coverage_df                - Pathway gene coverage summary
-#   correlation_df             - RNA-pathway vs RPPA correlation table
+#   pathway_score_results      - Combined table containing all 8 curated
+#                                scores PLUS the new 'score_rna_datadriven'
+#                                feature.
 #
-# Outputs:
-#   results/pathway_score_results.csv
-#   results/pathway_coverage_report.csv
-#   results/rna_rppa_correlation.csv
-#
-# Figures:
-#   figures/pathway_coverage.png
-#   figures/rna_rppa_correlations.png
-#
-# Note: this script is intended to be sourced by run_analysis.R.
+# Usage: this script is intended to be sourced by run_analysis.R.
 
-# Validate inputs -------------------------------------------------------------
 
-required_objects <- c(
-   "rnaseq_expression",
-   "rnaseq_gene_set_membership",
-   "selected_rppa_features",
-   "rppa_proteomics"
+# Validate inputs --------------------------------------------------------------
+
+check_required_objects(
+   c("rnaseq_expression", "rnaseq_gene_set_membership", "survival_data")
 )
 
-# Enforce defensive checks to ensure previous steps generated required data
-check_required_objects(required_objects)
-check_has_sample_id("rnaseq_expression")
 
-# Prepare RNA expression matrix -----------------------------------------------
+# Prepare data structures ------------------------------------------------------
 
-# Move sample_id to row names so the matrix contains purely numeric expression values
-rna_mat <- rnaseq_expression |>
-   tibble::column_to_rownames("sample_id")
-
-# Dynamically extract all 8 signature queries present in the dataset
+rna_df         <- rnaseq_expression
 unique_queries <- unique(rnaseq_gene_set_membership$query)
 
-# Helper functions ------------------------------------------------------------
 
-# Computes the simple row-wise average of expressions for a given signature block
+# Mathematical engine helpers --------------------------------------------------
+
 compute_mean_score <- function(x) {
    rowMeans(x, na.rm = TRUE)
 }
 
-# Extracts the first principal component (PC1) to capture maximum co-expression variance
 compute_pc1_score <- function(x) {
    if (ncol(x) < 2L) {
       return(rep(NA_real_, nrow(x)))
    }
-   stats::prcomp(x, center = TRUE, scale. = TRUE)$x[, 1]
+   stats::prcomp(x, center = TRUE, scale. = TRUE)$x[, 1L]
 }
 
-# Compute pathway scores and coverage across all 8 signatures -----------------
 
-score_list <- list()
+# Engine 1: Curated knowledge-driven pathways (8 signatures) -------------------
+
+message("Running Engine 1: Computing scores for 8 curated MSigDB signatures...")
+
+score_list    <- list()
 coverage_list <- list()
 
 for (pw in unique_queries) {
-   # Isolate the curated gene symbols associated with the active signature query
    gene_set <- rnaseq_gene_set_membership |>
       dplyr::filter(.data$query == !!pw) |>
-      dplyr::pull(.data$gene_symbol) |>
+      dplyr::pull(gene_symbol) |>
       unique()
    
-   # Map gene symbols to matching rnaseq_expression column headers (prefixed with rna_)
-   gene_cols <- paste0("rna_", gene_set)
-   genes_present <- intersect(gene_cols, colnames(rna_mat))
+   gene_cols     <- paste0("rna_", gene_set)
+   genes_present <- intersect(gene_cols, colnames(rna_df))
    
-   # Extract a narrow sub-matrix containing only the available genes for this signature
-   mat_pw <- rna_mat[, genes_present, drop = FALSE]
-   
-   if (ncol(mat_pw) == 0L) {
-      warning("No RNA genes found for signature pathway: ", pw, call. = FALSE)
+   if (length(genes_present) == 0L) {
       next
    }
    
-   # Generate the unadjusted baseline average scores
+   # Extract local continuous matrix only when required for numeric functions
+   mat_pw <- rna_df |>
+      dplyr::select(dplyr::all_of(genes_present)) |>
+      as.matrix()
+   
    score_list[[paste0("score_", pw, "_mean")]] <- compute_mean_score(mat_pw)
+   score_list[[paste0("score_", pw)]]          <- compute_pc1_score(mat_pw)
    
-   # Generate the primary PC1 multi-omics modelling features
-   score_list[[paste0("score_", pw)]] <- compute_pc1_score(mat_pw)
-   
-   # Track data completeness and platform gene coverage metrics
    coverage_list[[pw]] <- tibble::tibble(
       pathway      = pw,
       n_present    = length(genes_present),
@@ -108,190 +83,104 @@ for (pw in unique_queries) {
    )
 }
 
-# Pathway score table ---------------------------------------------------------
 
-# Instantiate a wide table indexed by sample barcodes
-pathway_score_results <- tibble::tibble(
-   sample_id = rownames(rna_mat)
+# Engine 2: Unbiased data-driven feature selection by p-value ------------------
+
+message(
+   "Running Engine 2: Executing unbiased genome-wide univariable screening..."
 )
 
-# Dynamically bind all calculated means and PC1 scores as distinct columns
+# Align survival outcomes with the RNA expression matrix rows cleanly
+outcome_df <- survival_data |>
+   dplyr::select(sample_id, os_months, os_event) |>
+   dplyr::mutate(sample_id = standardise_sample_id(.data$sample_id))
+
+all_rna_cols            <- names(rna_df)[names(rna_df) != "sample_id"]
+univariable_rna_results <- list()
+
+# Run a univariable Cox regression for every single available gene column
+for (g_col in all_rna_cols) {
+   single_gene_df <- rna_df |>
+      dplyr::select(sample_id, dplyr::all_of(g_col)) |>
+      dplyr::rename(expression = dplyr::all_of(g_col)) |>
+      dplyr::inner_join(outcome_df, by = "sample_id") |>
+      tidyr::drop_na()
+   
+   if (nrow(single_gene_df) < 10L) {
+      next
+   }
+   
+   # Suppress single-gene separation warnings during high-throughput screening
+   fit_gene <- tryCatch(
+      suppressWarnings(
+         survival::coxph(
+            survival::Surv(os_months, os_event) ~ expression,
+            data = single_gene_df,
+            ties = "efron"
+         )
+      ),
+      error = function(e) NULL
+   )
+   
+   if (!is.null(fit_gene)) {
+      coef_summary <- broom::tidy(fit_gene)
+      if (nrow(coef_summary) > 0L) {
+         univariable_rna_results[[g_col]] <- tibble::tibble(
+            gene_feature = g_col,
+            p_value      = coef_summary$p.value[1L]
+         )
+      }
+   }
+}
+
+# Compile and rank the results by statistical significance
+rna_screening_df <- dplyr::bind_rows(univariable_rna_results) |>
+   dplyr::arrange(.data$p_value)
+
+# Isolate the top 20 most statistically significant prognostic genes
+top_20_datadriven_genes <- rna_screening_df |>
+   dplyr::slice_head(n = 20L) |>
+   dplyr::pull(gene_feature)
+
+message(
+   "Isolated the top 20 most significant data-driven genes. Top 3: ", 
+   paste(
+      head(stringr::str_remove(top_20_datadriven_genes, "^rna_"), 3L),
+      collapse = ", "
+   )
+)
+
+# Extract the continuous sub-matrix for PCA reduction via tidy select
+mat_datadriven <- rna_df |>
+   dplyr::select(dplyr::all_of(top_20_datadriven_genes)) |>
+   as.matrix()
+
+score_list[["score_rna_datadriven"]] <- compute_pc1_score(mat_datadriven)
+
+
+# Compile and export cohort data -----------------------------------------------
+
+pathway_score_results <- tibble::tibble(sample_id = rna_df$sample_id)
 for (nm in names(score_list)) {
    pathway_score_results[[nm]] <- score_list[[nm]]
 }
 
-# Coverage summary ------------------------------------------------------------
-
-# Combine list elements into a single arranged reporting frame
 coverage_df <- dplyr::bind_rows(coverage_list) |>
    dplyr::arrange(.data$pct_coverage)
 
-# Save tables -----------------------------------------------------------------
-
+readr::write_csv(pathway_score_results, "results/pathway_score_results.csv")
+readr::write_csv(coverage_df, "results/pathway_coverage_report.csv")
 readr::write_csv(
-   pathway_score_results,
-   "results/pathway_score_results.csv"
+   rna_screening_df, "results/rna_datadriven_screening_pvalues.csv"
 )
 
-readr::write_csv(
-   coverage_df,
-   "results/pathway_coverage_report.csv"
-)
-
-# Coverage visualisation ------------------------------------------------------
-
-coverage_plot <- coverage_df |>
-   dplyr::mutate(
-      pathway = factor(.data$pathway, levels = .data$pathway)
+# Append results back directly into the active console workspace
+survival_data <- survival_data |>
+   dplyr::select(
+      -dplyr::any_of(
+         names(pathway_score_results)[names(pathway_score_results) != "sample_id"]
+      )
    ) |>
-   ggplot2::ggplot(
-      ggplot2::aes(x = .data$pathway, y = .data$pct_coverage)
-   ) +
-   ggplot2::geom_col(fill = "#2c3e50") +
-   ggplot2::geom_hline(
-      yintercept = 50,
-      linetype   = "dashed",
-      colour     = "#e74c3c"
-   ) +
-   ggplot2::coord_flip() +
-   ggplot2::ylim(0, 100) +
-   ggplot2::labs(
-      title = "RNA Pathway Gene Coverage (8 Signatures)",
-      x     = "MSigDB Signature Query",
-      y     = "% Genes Present in Dataset"
-   ) +
-   ggplot2::theme_classic()
+   dplyr::left_join(pathway_score_results, by = "sample_id")
 
-# Routing high-resolution export through our customized defensive graphics engine
-save_pipeline_plot(
-   plot_object = coverage_plot,
-   file_path   = "figures/pathway_coverage.png",
-   width       = 1000,
-   height      = 600,
-   resolution  = 100
-)
-
-# Merge pathway scores into survival_data -------------------------------------
-
-# Safe inclusion to append scores when running steps interactively inside the console
-if (exists("survival_data")) {
-   survival_data <- survival_data |>
-      dplyr::left_join(
-         pathway_score_results,
-         by = "sample_id"
-      )
-}
-
-# RPPA correlation analysis ---------------------------------------------------
-
-correlation_results <- list()
-
-for (pw in unique_queries) {
-   pw_col <- paste0("score_", pw)
-   
-   if (!pw_col %in% names(pathway_score_results)) {
-      next
-   }
-   
-   for (feat in selected_rppa_features) {
-      if (!feat %in% names(rppa_proteomics)) {
-         next
-      }
-      
-      # Extract clean non-missing sample frames intersected across both layers
-      merged <- rppa_proteomics |>
-         dplyr::select(dplyr::all_of(c("sample_id", feat))) |>
-         dplyr::inner_join(
-            pathway_score_results |> dplyr::select(dplyr::all_of(c("sample_id", pw_col))),
-            by = "sample_id"
-         ) |>
-         tidyr::drop_na()
-      
-      if (nrow(merged) < 10L) {
-         next
-      }
-      
-      # Evaluate non-parametric monotonic relationship via Spearman's Rho
-      r_val <- suppressWarnings(
-         stats::cor(
-            merged[[pw_col]],
-            merged[[feat]],
-            method = "spearman",
-            use    = "complete.obs"
-         )
-      )
-      
-      correlation_results[[length(correlation_results) + 1L]] <- tibble::tibble(
-         pathway      = pw,
-         rppa_feature = feat,
-         spearman_r   = r_val
-      )
-   }
-}
-
-correlation_df <- dplyr::bind_rows(correlation_results)
-
-if (nrow(correlation_df) > 0) {
-   correlation_df <- correlation_df |> 
-      dplyr::arrange(dplyr::desc(abs(.data$spearman_r)))
-} else {
-   correlation_df <- tibble::tibble(
-      pathway      = character(), 
-      rppa_feature = character(), 
-      spearman_r   = numeric()
-   )
-}
-
-readr::write_csv(
-   correlation_df,
-   "results/rna_rppa_correlation.csv"
-)
-
-# Correlation plot ------------------------------------------------------------
-
-if (nrow(correlation_df) > 0) {
-   correlation_plot <- correlation_df |>
-      ggplot2::ggplot(
-         ggplot2::aes(
-            x = stats::reorder(.data$rppa_feature, .data$spearman_r),
-            y = .data$spearman_r
-         )
-      ) +
-      ggplot2::geom_point(colour = "#2980b9", size = 2.5) +
-      ggplot2::facet_wrap(~pathway, scales = "free_y") +
-      ggplot2::coord_flip() +
-      ggplot2::geom_hline(
-         yintercept = c(-0.7, 0.7),
-         linetype   = "dashed",
-         colour     = "#e74c3c"
-      ) +
-      ggplot2::labs(
-         title = "Multi-Omics Collinearity: RNA Pathways vs Proteomic Markers",
-         x     = "LASSO Selected RPPA Feature",
-         y     = "Spearman Correlation Coefficient (r)"
-      ) +
-      ggplot2::theme_classic()
-   
-   save_pipeline_plot(
-      plot_object = correlation_plot,
-      file_path   = "figures/rna_rppa_correlations.png",
-      width       = 1400,
-      height      = 1000,
-      resolution  = 100
-   )
-}
-
-# Collinearity check ----------------------------------------------------------
-
-high_corr <- correlation_df |>
-   dplyr::filter(abs(.data$spearman_r) > 0.7)
-
-if (nrow(high_corr) > 0L) {
-   warning(
-      "High RNA-RPPA multi-omics collinearity detected (|r| > 0.7)",
-      call. = FALSE
-   )
-   print(high_corr)
-}
-
-message("Pathway scoring complete. All 8 distinct signatures processed successfully.")
+message("Pathway scoring and data-driven RNA selection complete.")

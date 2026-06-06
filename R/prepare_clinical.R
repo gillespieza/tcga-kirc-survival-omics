@@ -26,7 +26,7 @@
 #                               age        - Age at diagnosis (years)
 #                               sex        - Factor
 #                               stage      - Unordered factor
-#                                            (STAGE I, STAGE II, STAGE III, STAGE IV)
+#                                            (STAGEs I, II, III, IV)
 #                               grade      - Unordered factor (G1/G2, G3, G4);
 #                                            GX (not assessable) recoded to NA
 # clinical_survival_summary - Single-row tibble of patient/event counts and
@@ -35,7 +35,8 @@
 # Usage: this script is intended to be sourced by run_analysis.R as part of
 #        the full pipeline, not run directly.
 
-# Validate join keys -----------------------------------------------------------
+
+# Validate Join Keys -----------------------------------------------------------
 
 if (!"PATIENT_ID" %in% names(clinical_patient)) {
    stop(
@@ -52,14 +53,15 @@ if (!all(c("PATIENT_ID", "SAMPLE_ID") %in% names(clinical_sample))) {
    )
 }
 
-# Combine patient-level and sample-level clinical data -------------------------
 
-# check how many rows we had before the join, so we can compare after the join 
+# Combine Patient-Level and Sample-Level Clinical Data -------------------------
+
+# Check how many rows we had before the join, so we can compare after the join 
 # and check for unexpected changes in row count that might suggest issues with 
 # the join keys (e.g. non-unique PATIENT_ID in clinical_patient).
 n_samples_before <- nrow(clinical_sample)
 
-# join clinical sample data and clinical data, matching by PATIENT_ID. 
+# Join clinical sample data and clinical data, matching by PATIENT_ID. 
 # This will add patient-level data to each sample row.
 clinical_data <- clinical_sample |>
    dplyr::left_join(clinical_patient, by = "PATIENT_ID")
@@ -87,7 +89,7 @@ required_cols <- c(
 
 missing_cols <- setdiff(required_cols, names(clinical_data))
 
-if (length(missing_cols) > 0) {
+if (length(missing_cols) > 0L) {
    stop(
       "Joined clinical_data is missing expected column(s): ",
       paste(missing_cols, collapse = ", "),
@@ -101,12 +103,13 @@ message(
    ncol(clinical_data), " cols."
 )
 
-# Prepare clinical survival table ----------------------------------------------
+
+# Prepare Clinical Survival Table ----------------------------------------------
 
 stage_levels <- c("STAGE I", "STAGE II", "STAGE III", "STAGE IV")
 
 # Adjusted factor levels: G1 and G2 are collapsed to resolve statistical
-# separation issues in Cox models, and to create a stable baseline reference group
+# separation issues in Cox models, & to create a stable baseline reference group
 # for modelling the effect of grade on survival. 
 grade_levels <- c("G1/G2", "G3", "G4")
 
@@ -120,7 +123,7 @@ unexpected_grades <- setdiff(
    c("G1", "G2", "G3", "G4", "GX")
 )
 
-if (length(unexpected_stages) > 0) {
+if (length(unexpected_stages) > 0L) {
    warning(
       "Unexpected AJCC stage value(s) will be coerced to NA: ",
       paste(unexpected_stages, collapse = ", "),
@@ -128,7 +131,7 @@ if (length(unexpected_stages) > 0) {
    )
 }
 
-if (length(unexpected_grades) > 0) {
+if (length(unexpected_grades) > 0L) {
    warning(
       "Unexpected GRADE value(s) will be coerced to NA: ",
       paste(unexpected_grades, collapse = ", "),
@@ -158,17 +161,18 @@ clinical_survival <- clinical_data |>
          ) ~ 0L,
          TRUE ~ NA_integer_
       ),
-      age = as.numeric(.data$AGE),
-      sex = factor(.data$SEX),
+      age   = as.numeric(.data$AGE),
+      sex   = factor(.data$SEX),
       stage = factor(
          .data$AJCC_PATHOLOGIC_TUMOR_STAGE,
          levels  = stage_levels,
          ordered = FALSE # Prevents polynomial contrasts in Cox models
       ) |> droplevels(),
       
-      # Recode grade to collapse G1 and G2 into a stable baseline reference group
-      # GX (not assessable) is recoded to NA since it does not represent a meaningful 
-      # biological category and would be difficult to interpret in survival models.
+      # Recode grade to collapse G1 + G2 into a stable baseline reference group
+      # GX (not assessable) is recoded to NA since it does not represent a 
+      # meaningful biological category and would be difficult to interpret in 
+      # survival models.
       grade = dplyr::case_when(
          .data$GRADE == "GX" ~ NA_character_,
          .data$GRADE %in% c("G1", "G2") ~ "G1/G2",
@@ -194,14 +198,15 @@ message(
    " record(s) with missing os_months or os_event."
 )
 
-# Summarise available survival data -------------------------------------------
+
+# Summarise Available Survival Data -------------------------------------------
 
 clinical_survival_summary <- clinical_survival |>
    dplyr::summarise(
-      patients                = dplyr::n_distinct(patient_id),
-      samples                 = dplyr::n_distinct(sample_id),
-      events                  = sum(os_event),
-      median_follow_up_months = median(os_months, na.rm = TRUE)
+      patients                = dplyr::n_distinct(.data$patient_id),
+      samples                 = dplyr::n_distinct(.data$sample_id),
+      events                  = sum(.data$os_event),
+      median_follow_up_months = stats::median(.data$os_months, na.rm = TRUE)
    )
 
 message("Clinical survival table prepared.")

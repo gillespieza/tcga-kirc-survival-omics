@@ -42,13 +42,14 @@ message("Generating out-of-fold C-index comparison plot...")
 plot_cv_df <- cv_results |>
    dplyr::mutate(
       clean_label = dplyr::case_when(
-         model == "RNA_Path"   ~ "RNA Pathway Signatures (8)",
-         model == "CNA"        ~ "Copy Number Alterations (CNA)",
-         model == "Integrated" ~ "Fully Integrated Multi-Omics",
-         model == "Clinical"   ~ "Clinical Baseline Model",
-         model == "RPPA"       ~ "RPPA Proteomics (Top 5)",
-         model == "Mutations"  ~ "Somatic Mutations (9)",
-         TRUE                  ~ model
+         model == "RNA_Path"       ~ "RNA Pathway Signatures (8)",
+         model == "RNA_DataDriven" ~ "RNA Data-Driven Score (Top 20 p-val)", # Added
+         model == "CNA"            ~ "Copy Number Alterations (CNA)",
+         model == "Integrated"     ~ "Fully Integrated Multi-Omics",
+         model == "Clinical"       ~ "Clinical Baseline Model",
+         model == "RPPA"           ~ "RPPA Proteomics (Top 5)",
+         model == "Mutations"      ~ "Somatic Mutations (9)",
+         TRUE                      ~ model
       ),
       # Force sorting order to match descending performance values strictly
       clean_label = stats::reorder(.data$clean_label, .data$cv_concordance)
