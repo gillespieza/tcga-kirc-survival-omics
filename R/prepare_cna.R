@@ -99,7 +99,7 @@ cna_features_filtered <- cna_stats_base |>
 # Tier 2 Fallback: Relax to 2% if the strict threshold wipes out all features
 if (nrow(cna_features_filtered) == 0L) {
   warning(
-    "\u26a0\ufe0f No focal CNA features passed the strict 5% prevalence filter.",
+    "\u26a0\ufe0f No focal CNA features passed the strict 5% prevalence filter",
     call. = FALSE
   )
   message(
@@ -115,7 +115,7 @@ if (nrow(cna_features_filtered) == 0L) {
 # Tier 3 Ultimate Fallback: Retain the single most frequent alteration
 if (nrow(cna_features_filtered) == 0L) {
   warning(
-    "\u26a0\ufe0f No focal CNA features passed the relaxed 2% prevalence filter.",
+    "\u26a0\ufe0f No focal CNA features passed relaxed 2% prevalence filter",
     call. = FALSE
   )
   message(

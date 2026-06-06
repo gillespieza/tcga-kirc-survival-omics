@@ -153,7 +153,6 @@ results_list <- parallel::parLapply(cl, all_rna_cols, function(g_col) {
       ))
     }
   }
-  return(NULL)
 })
 
 parallel::stopCluster(cl)

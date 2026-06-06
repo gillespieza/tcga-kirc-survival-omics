@@ -36,7 +36,7 @@ message(
 )
 
 
-# KNOWLEDGE BASED FEATURE SELECTION --------------------------------------------
+# Knowledge Based Feature Selection --------------------------------------------
 # Gene set definitions
 # These queries are intentionally small and targeted so the downstream gene
 # universe stays interpretable.
@@ -66,28 +66,16 @@ gene_set_queries <- tibble::tibble(
 )
 
 fetch_gene_set <- function(query_name, collection, pattern) {
-  msig_tbl <- msigdbr::msigdbr(
-    species    = "Homo sapiens",
-    collection = collection
-  ) |>
-    dplyr::select(gs_name, gene_symbol)
-
-  if (nrow(msig_tbl) == 0L) {
-    stop(
-      "Empty MSigDB result for collection: ",
-      collection,
-      call. = FALSE
-    )
-  }
-
-  matched <- msig_tbl |>
+  # Perform high-speed in-memory regex filtration over pre-loaded reference
+  matched <- msig_reference |>
     dplyr::filter(
+      .data$collection == !!collection,
       stringr::str_detect(
         .data$gs_name,
         stringr::regex(pattern, ignore_case = TRUE)
       )
     ) |>
-    dplyr::distinct(.data$gs_name, .data$gene_symbol)
+    dplyr::distinct(gs_name, gene_symbol)
 
   if (nrow(matched) == 0L) {
     warning(
@@ -119,6 +107,15 @@ fetch_gene_set <- function(query_name, collection, pattern) {
 
 message("Now running knowledge-based feature selection.")
 message("Fetching MSigDB gene sets ...")
+
+# Pre-load required MSigDB collections once to eliminate redundant disk reads
+unique_colls <- unique(gene_set_queries$collection)
+
+msig_reference <- purrr::map_dfr(unique_colls, function(coll) {
+  msigdbr::msigdbr(species = "Homo sapiens", collection = coll) |>
+    dplyr::select(gs_name, gene_symbol) |>
+    dplyr::mutate(collection = coll)
+})
 
 gene_set_long <- purrr::pmap_dfr(
   gene_set_queries,

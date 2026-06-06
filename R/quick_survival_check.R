@@ -192,7 +192,7 @@ if (any(cox_zph$table[, "p"] < 0.05)) {
 # Kaplan-Meier Plots ----------------------------------------------------------
 
 # Overall KM curve
-overall_km_plot <- survminer::ggsurvplot( # Create KM plot object using survminer
+overall_km_plot <- survminer::ggsurvplot( # Create KM plot object with survminer
 
   # survfit object containing overall KM curve
   overall_km_fit,
