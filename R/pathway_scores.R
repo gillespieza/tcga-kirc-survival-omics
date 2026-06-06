@@ -160,7 +160,7 @@ coverage_plot <- coverage_df |>
       x     = "MSigDB Signature Query",
       y     = "% Genes Present in Dataset"
    ) +
-   ggplot2::theme_minimal()
+   ggplot2::theme_classic()
 
 # Routing high-resolution export through our customized defensive graphics engine
 save_pipeline_plot(
@@ -270,7 +270,7 @@ if (nrow(correlation_df) > 0) {
          x     = "LASSO Selected RPPA Feature",
          y     = "Spearman Correlation Coefficient (r)"
       ) +
-      ggplot2::theme_minimal()
+      ggplot2::theme_classic()
    
    save_pipeline_plot(
       plot_object = correlation_plot,

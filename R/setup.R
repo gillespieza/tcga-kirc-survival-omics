@@ -72,22 +72,34 @@ cran_packages <- c(
   "survminer", # Kaplan-Meier plots and survival-curve visualisation
   "glmnet", # Penalised regression, including LASSO Cox models
   "broom", # Tidy model summaries for Cox model results
+  "progress", # Progress bars for long-running steps 
   "msigdbr" # MSigDB gene sets for pathway analysis
+  
+  # "BiocManager", # Bioconductor package manager for any future bioinformatics packages
 )
 
 # Package installation helper --------------------------------------------------
 # Install any package that is not already available in the current R library.
 
 install_missing_packages <- function(packages) {
-  for (pkg in packages) {
-    if (!requireNamespace(pkg, quietly = TRUE)) {
-      install.packages(
-        pkg,
-        repos = "https://cloud.r-project.org"
-      )
-    }
+  # Identify packages not already present in the library
+  is_installed <- vapply(packages, requireNamespace, logical(1), quietly = TRUE)
+  missing_packages <- packages[!is_installed]
+
+  if (length(missing_packages) > 0) {
+    install.packages(
+      missing_packages,
+      repos = "https://cloud.r-project.org"
+    )
   }
 }
+
+#packageurl <- "https://cran.r-project.org/src/contrib/Archive/Matrix/Matrix_1.6-5.tar.gz"
+#install.packages(packageurl, repos=NULL, type="source")
+#install.packages("BiocManager")
+#BiocManager::install(c("GenomicFeatures", "AnnotationDbi"))
+
+
 
 # Package loading helper -------------------------------------------------------
 # Load each required package so downstream scripts can use them.
@@ -130,10 +142,23 @@ message("Packages loaded successfully.")
 set.seed(42)
 
 
+# Theme and Font Settings -------------------------------------------------
+theme_set(
+   theme_classic(
+      base_size = 13,
+      base_family = "sans"
+   )
+)
+
+
 # Project settings ------------------------------------------------------------
 # Kidney Renal Clear Cell Carcinoma, TCGA PanCancer Atlas
 
 study_id <- "kirc_tcga_pan_can_atlas_2018"
+
+# in case we decide to use TCGAbiolinks package for data retrieval in the future, 
+# this is the TCGA project code to use:
+# tcga_project <- "TCGA-KIRC" 
 
 # Local data file paths --------------------------------------------------------
 # Build project-relative paths to the local cBioPortal data files.
@@ -160,15 +185,15 @@ data_files <- c(
 missing_files <- data_files[!file.exists(data_files)]
 
 if (length(missing_files) > 0) {
-  stop(
-    "The following data files were not found:\n",
-    paste0(
-      "  - ", names(missing_files), ": ", missing_files,
-      collapse = "\n"
-    ),
-    "\nDownload them from cBioPortal and place them in the data/ directory.",
-    call. = FALSE
-  )
+   stop(
+      "The following data files were not found:\n",
+      paste0(
+         "  - ", names(missing_files), ": ", missing_files,
+         collapse = "\n"
+      ),
+      "\nDownload them from cBioPortal and place them in the data/ directory.",
+      call. = FALSE
+   )
 }
 
 message("All data files found.")

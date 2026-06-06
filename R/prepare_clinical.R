@@ -54,8 +54,13 @@ if (!all(c("PATIENT_ID", "SAMPLE_ID") %in% names(clinical_sample))) {
 
 # Combine patient-level and sample-level clinical data -------------------------
 
+# check how many rows we had before the join, so we can compare after the join 
+# and check for unexpected changes in row count that might suggest issues with 
+# the join keys (e.g. non-unique PATIENT_ID in clinical_patient).
 n_samples_before <- nrow(clinical_sample)
 
+# join clinical sample data and clinical data, matching by PATIENT_ID. 
+# This will add patient-level data to each sample row.
 clinical_data <- clinical_sample |>
    dplyr::left_join(clinical_patient, by = "PATIENT_ID")
 
@@ -97,9 +102,12 @@ message(
 )
 
 # Prepare clinical survival table ----------------------------------------------
-# Adjusted factor levels: G1 and G2 are collapsed to resolve statistical separation
 
 stage_levels <- c("STAGE I", "STAGE II", "STAGE III", "STAGE IV")
+
+# Adjusted factor levels: G1 and G2 are collapsed to resolve statistical
+# separation issues in Cox models, and to create a stable baseline reference group
+# for modelling the effect of grade on survival. 
 grade_levels <- c("G1/G2", "G3", "G4")
 
 unexpected_stages <- setdiff(
@@ -159,6 +167,8 @@ clinical_survival <- clinical_data |>
       ) |> droplevels(),
       
       # Recode grade to collapse G1 and G2 into a stable baseline reference group
+      # GX (not assessable) is recoded to NA since it does not represent a meaningful 
+      # biological category and would be difficult to interpret in survival models.
       grade = dplyr::case_when(
          .data$GRADE == "GX" ~ NA_character_,
          .data$GRADE %in% c("G1", "G2") ~ "G1/G2",

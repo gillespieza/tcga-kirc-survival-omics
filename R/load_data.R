@@ -1,7 +1,7 @@
 # Load raw cBioPortal data files ----------------------------------------------
 #
 # Reads all local cBioPortal data files into memory as tibbles. File paths are
-# are expected to have been declared in setup.R. Comment lines (prefixed with #) 
+# are expected to have been declared in setup.R. Comment lines (prefixed with #)
 # are skipped automatically by read_tsv.
 #
 # Requires: setup.R to have been sourced by run_analysis.R so that the
@@ -35,6 +35,7 @@ required_path_objects <- c(
   "rnaseq_file"
 )
 
+# create a vector of any missing path objects.
 missing_path_objects <- required_path_objects[
   !vapply(
     required_path_objects,
@@ -44,6 +45,7 @@ missing_path_objects <- required_path_objects[
   )
 ]
 
+# if any are missing, stop with an informative error message.
 if (length(missing_path_objects) > 0) {
   stop(
     "The following required file path objects are missing:\n",
@@ -60,7 +62,7 @@ read_cbio <- function(path) {
   readr::read_tsv(
     file           = path,
     comment        = "#",
-    show_col_types = FALSE
+    show_col_types = FALSE # suppresses printing of column type messages
   )
 }
 

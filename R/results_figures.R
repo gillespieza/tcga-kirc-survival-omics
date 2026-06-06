@@ -96,7 +96,7 @@ cindex_comparison_plot <- plot_cv_df |>
       x        = "Model Configuration",
       y        = "Out-of-Fold Concordance Index (C-index)"
    ) +
-   ggplot2::theme_minimal(base_size = 13) +
+   ggplot2::theme_classic(base_size = 13) +
    ggplot2::theme(
       plot.title         = ggplot2::element_text(face = "bold", size = 14, colour = "#2c3e50"),
       plot.subtitle      = ggplot2::element_text(size = 11, colour = "#7f8c8d", margin = ggplot2::margin(b = 15)),
@@ -191,7 +191,7 @@ forest_plot <- plot_coefs_df |>
       x        = "Model Feature",
       y        = "Multivariable Hazard Ratio (Log Scale)"
    ) +
-   ggplot2::theme_minimal(base_size = 12) +
+   ggplot2::theme_classic(base_size = 12) +
    ggplot2::theme(
       plot.title         = ggplot2::element_text(face = "bold", size = 14, colour = "#2c3e50"),
       plot.subtitle      = ggplot2::element_text(size = 11, colour = "#7f8c8d", margin = ggplot2::margin(b = 15)),

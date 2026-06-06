@@ -190,21 +190,54 @@ if (any(cox_zph$table[, "p"] < 0.05)) {
 # Kaplan-Meier plots ----------------------------------------------------------
 
 # Overall KM curve
-overall_km_plot <- survminer::ggsurvplot(
+overall_km_plot <- survminer::ggsurvplot( # Create KM plot object using survminer
+
+  # survfit object containing overall KM curve
   overall_km_fit,
-  data       = survival_data,
+  
+  # original dataset used to build the survival model
+  data = survival_data,
+  
+  # do show (=TRUE) confidence intervals around survival curves
+  conf.int = TRUE,
+  
+  # add a risk table below the plot (number at risk over time)
   risk.table = TRUE,
+  
+  # don't show any legend
   legend     = "none",
+  
+  # put a dotted line horizontal and vertical for median
+  surv.median.line = "hv",
+  
+  # x-axis legend
   xlab       = "Time (months)",
+  
+  # y-axis legend
   ylab       = "Overall survival probability",
-  title      = "TCGA KIRC: overall survival"
+  
+  # plot title
+  title      = "TCGA KIRC: overall survival",
+  
+  # Nature Publishing Group colours
+  palette = "npg",
+  
+  # line thickness
+  linewidth = 1.0,
+  
+  # Relative height of table (0–1 scale)
+  risk.table.height = 0.3,
+  
+  # Controls risk table styling separately
+  tables.theme = theme_classic()
 )
+
 
 save_pipeline_plot(
   plot_object = overall_km_plot,
   file_path   = "figures/overall_kaplan_meier.png",
   width       = 1800,
-  height      = 1600,
+  height      = 1200,
   resolution  = 220
 )
 
@@ -218,17 +251,27 @@ stage_km_fit <- survival::survfit(
   data = survival_data
 )
 
+
+# see comments in overall_km_plot for explanations of the parameters used here, 
+# which are mostly the same.
 stage_km_plot <- survminer::ggsurvplot(
-  stage_km_fit,
-  data         = survival_data,
-  risk.table   = TRUE,
-  pval         = TRUE,
-  pval.method  = TRUE,
-  legend.title = "Stage",
-  legend.labs  = levels(survival_data$stage),
-  xlab         = "Time (months)",
-  ylab         = "Overall survival probability",
-  title        = "TCGA KIRC: overall survival by AJCC stage"
+   stage_km_fit,
+   data = survival_data,
+   conf.int = FALSE,
+   risk.table = TRUE,
+   pval = TRUE,
+   pval.method  = TRUE,
+   legend.title = "Stage",                
+   legend.labs = levels(survival_data$stage),
+   xlab = "Time (months)",
+   ylab = "Overall survival probability",
+   title = "TCGA KIRC: overall survival by AJCC stage",
+   risk.table.y.text.col = TRUE, 
+   risk.table.y.text = FALSE,
+   risk.table.height = 0.3,
+   palette = "npg",
+   linewidth = 1.0,
+   tables.theme = theme_classic()
 )
 
 save_pipeline_plot(
@@ -240,3 +283,123 @@ save_pipeline_plot(
 )
 
 message("Saved stage-stratified KM plot to figures/stage_kaplan_meier.png")
+
+# Grade-stratified KM curve
+# Log-rank test p-value and method label are included to indicate whether
+# stage groups differ significantly in survival.
+grade_km_fit <- survival::survfit(
+  overall_surv_obj ~ grade,
+  data = survival_data
+)
+
+
+# see comments in overall_km_plot for explanations of the parameters used here, 
+# which are mostly the same.
+grade_km_plot <- survminer::ggsurvplot(
+   grade_km_fit,
+   data = survival_data,
+   conf.int = FALSE,
+   risk.table = TRUE,
+   pval = TRUE,
+   pval.method  = TRUE,
+   legend.title = "Grade",                
+   legend.labs = levels(survival_data$grade),
+   xlab = "Time (months)",
+   ylab = "Overall survival probability",
+   title = "TCGA KIRC: overall survival by histological grade",
+   risk.table.y.text.col = TRUE, 
+   risk.table.y.text = FALSE,
+   risk.table.height = 0.3,
+   palette = "npg",
+   linewidth = 1.0,
+   tables.theme = theme_classic()
+)
+
+save_pipeline_plot(
+  plot_object = grade_km_plot,
+  file_path   = "figures/grade_kaplan_meier.png",
+  width       = 1800,
+  height      = 1800,
+  resolution  = 220
+)
+
+message("Saved grade-stratified KM plot to figures/grade_kaplan_meier.png")
+
+
+
+# EXPLORATORY P-VALUE FEATURE SELECTION --------------------------------------------------
+# filter omics features at a statistical significance level 0.1 or 0.2 (larger than 0.05 
+# to reduce false negative identification of omics features in multivariate analysis). 
+
+# Use the raw RNA-seq data source so this step runs over the full gene matrix.
+check_required_objects("rnaseq_data")
+check_has_columns("rnaseq_data", "Hugo_Symbol")
+
+rnaseq_all_expression <- rnaseq_data |>
+  dplyr::mutate(
+    row_mean = rowMeans(
+      as.matrix(dplyr::pick(-dplyr::all_of("Hugo_Symbol"))),
+      na.rm = TRUE
+    )
+  ) |>
+  dplyr::arrange(dplyr::desc(.data$row_mean)) |>
+  dplyr::distinct(.data$Hugo_Symbol, .keep_all = TRUE) |>
+  dplyr::select(-dplyr::all_of("row_mean")) |>
+  tidyr::pivot_longer(
+    cols = -dplyr::all_of("Hugo_Symbol"),
+    names_to = "sample_id",
+    values_to = "rsem"
+  ) |>
+  dplyr::mutate(
+    sample_id = standardise_sample_id(.data$sample_id),
+    rsem = tidyr::replace_na(.data$rsem, 0),
+    log2_expr = log2(.data$rsem + 1)
+  ) |>
+  dplyr::select(.data$sample_id, .data$Hugo_Symbol, .data$log2_expr) |>
+  tidyr::pivot_wider(
+    names_from = "Hugo_Symbol",
+    values_from = "log2_expr"
+  ) |>
+  dplyr::rename_with(~ paste0("rna_", .x), -dplyr::all_of("sample_id"))
+
+cohort_rna <- clinical_survival |>
+  inner_join(rnaseq_all_expression, by = "sample_id")
+
+gene_names <- names(cohort_rna)[startsWith(names(cohort_rna), "rna_")]
+n_genes <- length(gene_names)
+
+rna_pvalues <- numeric(length(gene_names))
+
+message("Now running p-value feature selection for ", n_genes, " genes...")
+
+pb <- utils::txtProgressBar(min = 0, max = n_genes, style = 3)
+
+for (i in seq_along(gene_names)) {
+  gene <- gene_names[i]
+  formula <- as.formula(paste0(
+    "survival::Surv(os_months, os_event) ~ `",
+    gene,
+    "`"
+  ))
+  fit <- survival::coxph(formula, data = cohort_rna)
+  rna_pvalues[i] <- summary(fit)$coefficients[, "Pr(>|z|)"]
+  utils::setTxtProgressBar(pb, i)
+}
+
+close(pb)
+
+gene_pvalues <- tibble::tibble(
+  gene = gene_names,
+  p_value = rna_pvalues
+)
+
+significant_genes <- gene_pvalues |>
+  dplyr::filter(p_value < 0.1)
+
+# significant_genes <- sub("^rna_", "", significant_genes)
+
+message(
+  "Found ",
+  nrow(significant_genes),
+  " genes with p < 0.1."
+)

@@ -1,5 +1,5 @@
 ============================================================
-Pipeline run started: 2026-06-04 22:03:57.262415
+Pipeline run started: 2026-06-05 18:47:58.844662
 ============================================================
 ------------------------------------------------------------
 Step: Validation error helper functions
@@ -20,7 +20,7 @@ Script: R/setup.R
 
 [MESSAGE] Working study ID: kirc_tcga_pan_can_atlas_2018
 
-Completed Package setup and configuration in 150 ms.
+Completed Package setup and configuration in 470 ms.
 ------------------------------------------------------------
 Step: Load raw cBioPortal data
 Script: R/load_data.R
@@ -39,7 +39,7 @@ Script: R/load_data.R
 
 [MESSAGE] All data files loaded successfully.
 
-Completed Load raw cBioPortal data in 11.58 s.
+Completed Load raw cBioPortal data in 9.64 s.
 ------------------------------------------------------------
 Step: Prepare clinical survival table
 Script: R/prepare_clinical.R
@@ -50,7 +50,7 @@ Script: R/prepare_clinical.R
 
 [MESSAGE] Clinical survival table prepared.
 
-Completed Prepare clinical survival table in 60 ms.
+Completed Prepare clinical survival table in 370 ms.
 ------------------------------------------------------------
 Step: Prepare RPPA proteomics data
 Script: R/prepare_rppa.R
@@ -59,12 +59,14 @@ Script: R/prepare_rppa.R
 
 [MESSAGE] RPPA proteomics table prepared: 455 samples x 198 features. 3.5% missing values.
 
-Completed Prepare RPPA proteomics data in 3.68 s.
+Completed Prepare RPPA proteomics data in 3.79 s.
 ------------------------------------------------------------
 Step: Prepare RNA-seq data
 Script: R/prepare_rnaseq.R
 ------------------------------------------------------------
 [MESSAGE] Input RNA-seq data: 20531 genes x 511 samples.
+
+[MESSAGE] Now running knowledge-based feature selection.
 
 [MESSAGE] Fetching MSigDB gene sets ...
 
@@ -96,7 +98,7 @@ Script: R/prepare_rnaseq.R
 
 [MESSAGE] Total genes retained: 3923
 
-Completed Prepare RNA-seq data in 32.56 s.
+Completed Prepare RNA-seq data in 33.71 s.
 ------------------------------------------------------------
 Step: Prepare binary mutation features
 Script: R/prepare_mutations.R
@@ -105,7 +107,7 @@ Script: R/prepare_mutations.R
 
 [MESSAGE] Mutation feature table prepared: 275 samples x 9 driver gene features.
 
-Completed Prepare binary mutation features in 790 ms.
+Completed Prepare binary mutation features in 550 ms.
 ------------------------------------------------------------
 Step: Prepare binary CNA features
 Script: R/prepare_cna.R
@@ -120,7 +122,7 @@ Script: R/prepare_cna.R
 
 [MESSAGE] CNA preparation complete. Isolated 4 stable focal feature(s).
 
-Completed Prepare binary CNA features in 470 ms.
+Completed Prepare binary CNA features in 3.03 s.
 ------------------------------------------------------------
 Step: Integrate multi-omics data layers
 Script: R/integrate_data.R
@@ -139,7 +141,7 @@ Script: R/integrate_data.R
 
 [MESSAGE] Integration complete. 454 samples fully combined into multi-omics workspace.
 
-Completed Integrate multi-omics data layers in 1 s.
+Completed Integrate multi-omics data layers in 1.04 s.
 ------------------------------------------------------------
 Step: Baseline cohort survival check
 Script: R/quick_survival_check.R
@@ -158,6 +160,16 @@ Script: R/quick_survival_check.R
 
 [WARNING] Baseline cohort survival check: One or more covariates show evidence of non-proportional hazards. Consider time-varying coefficients or a stratified Cox model.
 [MESSAGE] [38;5;232mIgnoring unknown labels:
+[36m•[38;5;232m [32mfill[38;5;232m : [34m"Strata"[38;5;232m[39m
+[MESSAGE] [38;5;232mIgnoring unknown labels:
+[36m•[38;5;232m [32mfill[38;5;232m : [34m"Strata"[38;5;232m[39m
+[MESSAGE] [38;5;232mIgnoring unknown labels:
+[36m•[38;5;232m [32mfill[38;5;232m : [34m"Strata"[38;5;232m[39m
+[MESSAGE] [38;5;232mIgnoring unknown labels:
+[36m•[38;5;232m [32mfill[38;5;232m : [34m"Strata"[38;5;232m[39m
+[MESSAGE] [38;5;232mIgnoring unknown labels:
+[36m•[38;5;232m [32mfill[38;5;232m : [34m"Strata"[38;5;232m[39m
+[MESSAGE] [38;5;232mIgnoring unknown labels:
 [36m•[38;5;232m [32mcolour[38;5;232m : [34m"Strata"[38;5;232m[39m
 [MESSAGE] Saved overall KM plot to figures/overall_kaplan_meier.png
 
@@ -165,7 +177,79 @@ Script: R/quick_survival_check.R
 [36m•[38;5;232m [32mcolour[38;5;232m : [34m"Stage"[38;5;232m[39m
 [MESSAGE] Saved stage-stratified KM plot to figures/stage_kaplan_meier.png
 
-Completed Baseline cohort survival check in 9.33 s.
+[MESSAGE] [38;5;232mIgnoring unknown labels:
+[36m•[38;5;232m [32mcolour[38;5;232m : [34m"Grade"[38;5;232m[39m
+[MESSAGE] Saved grade-stratified KM plot to figures/grade_kaplan_meier.png
+
+[WARNING] Baseline cohort survival check: [38;5;232mUse of .data in tidyselect expressions was deprecated in tidyselect 1.2.0.
+[36mℹ[38;5;232m Please use `"sample_id"` instead of `.data$sample_id`
+[90mThis warning is displayed once per session.[38;5;232m
+[90mCall ]8;;ide:run:lifecycle::last_lifecycle_warnings()lifecycle::last_lifecycle_warnings()]8;; to see where this warning was generated.[38;5;232m[39m
+[WARNING] Baseline cohort survival check: [38;5;232mUse of .data in tidyselect expressions was deprecated in tidyselect 1.2.0.
+[36mℹ[38;5;232m Please use `"Hugo_Symbol"` instead of `.data$Hugo_Symbol`
+[90mThis warning is displayed once per session.[38;5;232m
+[90mCall ]8;;ide:run:lifecycle::last_lifecycle_warnings()lifecycle::last_lifecycle_warnings()]8;; to see where this warning was generated.[38;5;232m[39m
+[WARNING] Baseline cohort survival check: [38;5;232mUse of .data in tidyselect expressions was deprecated in tidyselect 1.2.0.
+[36mℹ[38;5;232m Please use `"log2_expr"` instead of `.data$log2_expr`
+[90mThis warning is displayed once per session.[38;5;232m
+[90mCall ]8;;ide:run:lifecycle::last_lifecycle_warnings()lifecycle::last_lifecycle_warnings()]8;; to see where this warning was generated.[38;5;232m[39m
+[MESSAGE] Now running p-value feature selection for 20512 genes...
+
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[WARNING] Baseline cohort survival check: Loglik converged before variable  1 ; coefficient may be infinite. 
+[MESSAGE] Found 12456 genes with p < 0.1.
+
+Completed Baseline cohort survival check in 962.54 s.
 ------------------------------------------------------------
 Step: Screen RPPA - multivariable LASSO
 Script: R/feature_selection.R
@@ -181,14 +265,14 @@ Script: R/feature_selection.R
 [WARNING] Screen RPPA - multivariable LASSO: LASSO shrunk all protein coefficients to zero at lambda.min due to clinical dominance. Falling back to the top 5 most robust univariable prognostic markers to guarantee pipeline continuity.
 [MESSAGE] RPPA feature selection complete: Isolated 5 robust prognostic protein markers.
 
-Completed Screen RPPA - multivariable LASSO in 7.05 s.
+Completed Screen RPPA - multivariable LASSO in 7.14 s.
 ------------------------------------------------------------
 Step: Calculate RNA pathway scores
 Script: R/pathway_scores.R
 ------------------------------------------------------------
 [MESSAGE] Pathway scoring complete. All 8 distinct signatures processed successfully.
 
-Completed Calculate RNA pathway scores in 13.69 s.
+Completed Calculate RNA pathway scores in 11.3 s.
 ------------------------------------------------------------
 Step: Compare cross-validated models
 Script: R/survival_models.R
@@ -227,7 +311,7 @@ Script: R/survival_models.R
 [WARNING] Compare cross-validated models: Loglik converged before variable  15,16,17 ; coefficient may be infinite. 
 [MESSAGE] Survival modelling complete. Model objects held in memory and exported to /results.
 
-Completed Compare cross-validated models in 1.93 s.
+Completed Compare cross-validated models in 2.26 s.
 ------------------------------------------------------------
 Step: Create report-ready outputs
 Script: R/results_figures.R
@@ -238,7 +322,7 @@ Script: R/results_figures.R
 
 [MESSAGE] Publication figures successfully generated and saved to /figures.
 
-Completed Create report-ready outputs in 4.06 s.
+Completed Create report-ready outputs in 4.01 s.
 ============================================================
-Pipeline complete. Total time: 89.09 s.
+Pipeline complete. Total time: 1041 s.
 ============================================================

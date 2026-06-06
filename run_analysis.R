@@ -21,6 +21,8 @@
 # )
 # lintr::lint(filename = "R/utils_validation.R")
 
+install.packages("cli") # For styled console output and consistent messaging
+library(cli) # Load cli early for consistent messaging
 
 # Project structure check ------------------------------------------------------
 
@@ -46,6 +48,8 @@ if (!dir.exists("figures")) {
 
 log_file_path <- file.path("results", "pipeline_log.txt")
 
+# Initialize the pipeline log with a timestamped header.
+# This overwrites any existing file so each run starts fresh.
 writeLines(
   text = c(
     strrep("=", 60),
@@ -56,6 +60,7 @@ writeLines(
 )
 
 # Logging helper ---------------------------------------------------------------
+# Send a message to the console and append the same text to the pipeline log.
 
 log_message <- function(...) {
   message_text <- paste0(...)
@@ -68,6 +73,8 @@ log_message <- function(...) {
 }
 
 # Time-formatting helper -------------------------------------------------------
+# Convert elapsed seconds into a human-readable string using ms for sub-second
+# durations and seconds for longer durations.
 
 format_elapsed_time <- function(time_seconds) {
   if (time_seconds < 1) {
@@ -86,22 +93,22 @@ pipeline_steps <- tibble::tribble(
   file.path("R", "utils_validation.R"),     "Validation error helper functions",
   file.path("R", "setup.R"),                "Package setup and configuration",
   file.path("R", "load_data.R"),            "Load raw cBioPortal data",
-  
+
   # Phase 2: Individual Layer Data Cleaning (Isolation Stage)
   file.path("R", "prepare_clinical.R"),     "Prepare clinical survival table",
   file.path("R", "prepare_rppa.R"),         "Prepare RPPA proteomics data",
   file.path("R", "prepare_rnaseq.R"),       "Prepare RNA-seq data",
   file.path("R", "prepare_mutations.R"),    "Prepare binary mutation features",
   file.path("R", "prepare_cna.R"),          "Prepare binary CNA features",
-  
+
   # Phase 3: Master Cohort Integration & Clinical Benchmarking
   file.path("R", "integrate_data.R"),       "Integrate multi-omics data layers",
   file.path("R", "quick_survival_check.R"), "Baseline cohort survival check",
-  
-  # # Phase 4: Downstream Multi-Omics Feature Extraction
+
+  # Phase 4: Downstream Multi-Omics Feature Extraction
   file.path("R", "feature_selection.R"),    "Screen RPPA - multivariable LASSO",
   file.path("R", "pathway_scores.R"),       "Calculate RNA pathway scores",
-  
+
   # Phase 5: Final Cross-Validated Modelling & Publication Figures
   file.path("R", "survival_models.R"),      "Compare cross-validated models",
   file.path("R", "results_figures.R"),      "Create report-ready outputs"
@@ -109,6 +116,7 @@ pipeline_steps <- tibble::tribble(
 
 # Pipeline script existence check ----------------------------------------------
 
+# Create a tibble of pipeline steps whose script files are missing from disk.
 missing_scripts <- pipeline_steps |>
   dplyr::filter(!file.exists(path))
 
@@ -122,23 +130,33 @@ if (nrow(missing_scripts) > 0) {
 
 # Helper function for one pipeline step ----------------------------------------
 
+# Execute a single pipeline script while printing and logging progress,
+# handling messages, warnings, and errors, and measuring elapsed time.
+# This is all done using coloured console output for easier reading.
 source_step <- function(path, step_name) {
-  plain_header <- strrep("-", 60)
-  plain_step <- paste0("Step: ", step_name)
-  plain_script <- paste0("Script: ", path)
+  plain_line <- strrep("-", 60) # a line of hyphens for visual separation
+  plain_step <- paste0("Step: ", step_name) # the step number and description
+  plain_script <- paste0("Script: ", path) # the name of the file being run
 
-  cli::cli_text(cli::col_black(plain_header))
+  # Write the step to the console with styling for better readability. 
+  # See the cli package documentation here: 
+  # https://cran.r-project.org/web/packages/cli/refman/cli.html#cli_text
+  cli::cli_text(cli::col_black(plain_line)) # output to the command line with styling
   cli::cli_text(cli::style_bold(cli::col_black(plain_step)))
   cli::cli_text(cli::col_black(plain_script))
-  cli::cli_text(cli::col_black(plain_header))
+  cli::cli_text(cli::col_black(plain_line)) 
 
+  # Write the step to the pipeline log file without styling, so it can be read back in later if needed.
   write(
-    x = c(plain_header, plain_step, plain_script, plain_header),
+    x = c(plain_line, plain_step, plain_script, plain_line),
     file = log_file_path, append = TRUE
   )
 
+  # Start a timer to measure how long the script is taking.
   t_start <- proc.time()
 
+  # Execute the script with error handling. If an error occurs, it will be caught and logged, 
+  # and the pipeline will stop immediately.
   withCallingHandlers(
     tryCatch(
       source(path),
@@ -193,8 +211,11 @@ source_step <- function(path, step_name) {
 
 # Run pipeline -----------------------------------------------------------------
 
+# Create a start time reference point.
 t_pipeline_start <- proc.time()
 
+# Loop through each pipeline step and execute it using the source_step function 
+# defined above.
 for (i in seq_len(nrow(pipeline_steps))) {
   source_step(
     path = pipeline_steps$path[[i]],
@@ -214,6 +235,8 @@ writeLines(
   con = session_info_path
 )
 
+# Write a final completion message to the console and the pipeline log, including 
+# the total elapsed time for the entire pipeline run.
 cli::cli_text(cli::col_green(strrep("=", 60)))
 cli::cli_text(cli::style_bold(cli::col_green(
   paste0(

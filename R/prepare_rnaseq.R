@@ -33,7 +33,8 @@ message(
 )
 
 
-# Gene set definitions --------------------------------------------------------
+# KNOWLEDGE BASED FEATURE SELECTION --------------------------------------------------
+# Gene set definitions 
 # These queries are intentionally small and targeted so the downstream gene
 # universe stays interpretable.
 
@@ -126,6 +127,7 @@ fetch_gene_set <- function(query_name, collection, pattern) {
 
 # Retrieve MSigDB gene sets ---------------------------------------------------
 
+message("Now running knowledge-based feature selection.")
 message("Fetching MSigDB gene sets ...")
 
 gene_set_long <- purrr::pmap_dfr(
