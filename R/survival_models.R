@@ -3,8 +3,7 @@
 # Evaluates and compares the out-of-fold predictive performance of seven
 # distinct survival models using stratified 5-fold cross-validation with
 # fold-level invariance guards to prevent statistical separation crashes:
-#   1. Clinical Baseline (Age, Sex, Stage, Grade)
-#   2. Clinical + Mutations
+#   1. Clinical Baseline
 #   3. Clinical + CNA
 #   4. Clinical + RPPA Proteomics (Top 5 LASSO-retained markers)
 #   5. Clinical + RNA Pathways (All 8 independent MSigDB signatures)
@@ -32,8 +31,7 @@
 check_required_objects(c(
   "survival_data",
   "selected_clinical_features",
-  "selected_rppa_features",
-  "selected_mutation_features"
+  "selected_rppa_features"
 ))
 
 required_base_cols <- c("os_months", "os_event", selected_clinical_features)
@@ -44,8 +42,6 @@ check_has_columns("survival_data", required_base_cols)
 # Dynamically extract available multi-omics predictors using prefixes
 
 clinical_vars <- selected_clinical_features
-
-mutation_vars <- selected_mutation_features
 
 cna_vars <- names(survival_data)[stringr::str_starts(
   names(survival_data),
@@ -68,7 +64,6 @@ rna_datadriven_vars <- "score_rna_datadriven"
 
 message("=== Modelling Feature Dimensions ===")
 message("Clinical Covariates    : ", length(clinical_vars))
-message("Somatic Mutations      : ", length(mutation_vars))
 message("Copy Number Alterations: ", length(cna_vars))
 message("RPPA Proteins          : ", length(rppa_vars))
 message("RNA Curated Pathways   : ", length(rna_vars), " (8 signatures)")
@@ -84,12 +79,11 @@ message("====================================")
 
 model_specs <- list(
   Clinical = clinical_vars,
-  Mutations = c(clinical_vars, mutation_vars),
   CNA = c(clinical_vars, cna_vars),
   RPPA = c(clinical_vars, rppa_vars),
   RNA_Path = c(clinical_vars, rna_vars),
   RNA_DataDriven = c(clinical_vars, rna_datadriven_vars),
-  Integrated = c(clinical_vars, mutation_vars, cna_vars, rppa_vars, rna_vars)
+  Integrated = c(clinical_vars, cna_vars, rppa_vars, rna_vars)
 )
 
 

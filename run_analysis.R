@@ -3,8 +3,8 @@
 # Overview:
 #   An integrated, multi-omics machine learning and survival modeling pipeline
 #   for Kidney Renal Clear Cell Carcinoma (TCGA-KIRC). The workflow ingests
-#   curated clinical metadata, RPPA proteomics, RNA-seq expression, somatic
-#   mutations, and copy-number alterations (CNA). It executes automated data
+#   curated clinical metadata, RPPA proteomics, RNA-seq expression, and
+#   copy-number alterations (CNA). It executes automated data
 #   cleansing, clinical grade pooling, multi-omics sample cross-matching, and
 #   feature selection (multivariable LASSO for proteins and a comparative dual-
 #   engine transcriptomic profiling of 8 curated MSigDB pathways versus an
@@ -110,10 +110,10 @@ pipeline_steps <- tibble::tribble(
 
   # Phase 2: Individual Layer Data Cleaning (Isolation Stage)
   file.path("R", "prepare_clinical.R"),     "Prepare clinical survival table",
-  file.path("R", "screen_clinical.R"),      "Screen for predictors",
+  file.path("R", "screen_clinical.R"),      "Screen for clinical predictors",
   file.path("R", "prepare_rppa.R"),         "Prepare RPPA proteomics data",
   file.path("R", "prepare_rnaseq.R"),       "Prepare RNA-seq data",
-  file.path("R", "prepare_mutations.R"),    "Prepare binary mutation features",
+  #file.path("R", "prepare_mutations.R"),    "Prepare binary mutation features",
   file.path("R", "prepare_cna.R"),          "Prepare binary CNA features",
 
   # Phase 3: Master Cohort Integration & Clinical Benchmarking

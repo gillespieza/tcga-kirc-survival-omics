@@ -98,24 +98,6 @@ abort_if_false(
   "No usable numeric RPPA features were found for Cox screening."
 )
 
-# Drop rare somatic mutations with low prevalence (< 5%) to protect power
-mutation_feature_cols <- mutation_feature_cols[
-  vapply(
-    survival_data[mutation_feature_cols],
-    function(x) mean(x, na.rm = TRUE) >= 0.05,
-    logical(1L)
-  )
-]
-
-if (length(mutation_feature_cols) == 0L) {
-  warning(
-    "\u26a0\ufe0f No mutation feature columns passed the prevalence filter; ",
-    "mutation models will be skipped.",
-    call. = FALSE
-  )
-}
-
-
 # 1. Univariable Cox Screening Loop --------------------------------------------
 # Evaluates baseline prognostic value for each protein to support pathway scores
 
@@ -292,8 +274,6 @@ if (length(selected_rppa_features) > 10L) {
     dplyr::filter(.data$feature %in% selected_rppa_features)
 }
 
-selected_mutation_features <- mutation_feature_cols
-
 
 # Write Outputs ---------------------------------------------------------------
 
@@ -305,11 +285,6 @@ readr::write_csv(
 readr::write_csv(
   tibble::tibble(feature = selected_rppa_features),
   "results/selected_rppa_features.csv"
-)
-
-readr::write_csv(
-  tibble::tibble(feature = selected_mutation_features),
-  "results/selected_mutation_features.csv"
 )
 
 message(

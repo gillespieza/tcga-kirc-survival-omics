@@ -6,14 +6,13 @@
 #
 # Requires: setup.R to have been sourced by run_analysis.R so that the
 # following path variables are defined: clinical_patient_file,
-# clinical_sample_file, mutation_file, cna_file, rppa_file, rnaseq_file.
+# clinical_sample_file, cna_file, rppa_file, rnaseq_file.
 #
 # Produces:
 # clinical_patient - Patient-level clinical data. Contains survival outcomes
 #                    and patient-level covariates (e.g. age, sex, stage).
 # clinical_sample  - Sample-level clinical data. Contains sample IDs and
 #                    tumour/sample-level variables (e.g. tumour site, purity).
-# mutation_data    - Somatic mutation calls, one row per variant/sample.
 # cna_data         - Gene-level copy-number alterations, wide gene x sample
 #                    matrix.
 # rppa_data        - RPPA protein expression z-scores, wide protein x sample
@@ -30,7 +29,6 @@
 required_path_objects <- c(
   "clinical_patient_file",
   "clinical_sample_file",
-  "mutation_file",
   "cna_file",
   "rppa_file",
   "rnaseq_file"
@@ -116,7 +114,6 @@ dataset_specs <- tibble::tibble(
   object_name = c(
     "clinical_patient",
     "clinical_sample",
-    "mutation_data",
     "cna_data",
     "rppa_data",
     "rnaseq_data"
@@ -124,7 +121,6 @@ dataset_specs <- tibble::tibble(
   path_object = c(
     "clinical_patient_file",
     "clinical_sample_file",
-    "mutation_file",
     "cna_file",
     "rppa_file",
     "rnaseq_file"
@@ -132,7 +128,6 @@ dataset_specs <- tibble::tibble(
   description = c(
     "patient-level clinical data",
     "sample-level clinical data",
-    "somatic mutation calls",
     "copy-number alteration matrix",
     "RPPA protein expression z-scores",
     "RNA-seq expression matrix"
@@ -140,7 +135,6 @@ dataset_specs <- tibble::tibble(
   required_columns = list(
     c("PATIENT_ID", "OS_STATUS", "OS_MONTHS"),
     c("PATIENT_ID", "SAMPLE_ID"),
-    c("Hugo_Symbol", "Tumor_Sample_Barcode"),
     c("Hugo_Symbol"),
     c("Composite.Element.REF"),
     c("Hugo_Symbol")

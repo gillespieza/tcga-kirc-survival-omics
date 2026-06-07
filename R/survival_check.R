@@ -6,7 +6,7 @@
 # and a proportional hazards assumption check.
 #
 # Requires: integrate_data.R to have been sourced so that
-#   clinical_rppa_rna_mutation is available in the global environment.
+#   clinical_rppa_rna_cna is available in the global environment.
 #   broom must be installed (it is installed alongside tidyverse but not
 #   attached by library("tidyverse")).
 #
@@ -36,7 +36,7 @@
 
 check_required_objects(
   c(
-    "clinical_rppa_rna_mutation",
+    "clinical_rppa_rna_cna",
     "selected_clinical_features"
   )
 )
@@ -51,7 +51,7 @@ required_survival_cols <- c(
 )
 
 check_has_columns(
-  "clinical_rppa_rna_mutation",
+  "clinical_rppa_rna_cna",
   c(required_survival_cols, selected_clinical_features)
 )
 
@@ -60,7 +60,7 @@ check_has_columns(
 # Factor levels and baseline reference positions are preserved exactly as
 # configured during the clinical preparation script.
 
-survival_data <- clinical_rppa_rna_mutation |>
+survival_data <- clinical_rppa_rna_cna |>
   dplyr::mutate(
     os_event = as.integer(.data$os_event)
   )
