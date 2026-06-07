@@ -113,7 +113,6 @@ pipeline_steps <- tibble::tribble(
   file.path("R", "screen_clinical.R"),      "Screen for clinical predictors",
   file.path("R", "prepare_rppa.R"),         "Prepare RPPA proteomics data",
   file.path("R", "prepare_rnaseq.R"),       "Prepare RNA-seq data",
-  #file.path("R", "prepare_mutations.R"),    "Prepare binary mutation features",
   file.path("R", "prepare_cna.R"),          "Prepare binary CNA features",
 
   # Phase 3: Master Cohort Integration & Clinical Benchmarking

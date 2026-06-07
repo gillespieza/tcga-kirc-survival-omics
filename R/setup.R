@@ -152,6 +152,45 @@ ggplot2::theme_set(
 
 study_id <- "kirc_tcga_pan_can_atlas_2018"
 
+# Define Driver Genes ---------------------------------------------------------
+# Commonly altered ccRCC genes selected from known kidney cancer biology.
+# Sources: doi:10.1038/nature12222 and doi:10.1158/1078-0432.CCR-15-2631
+
+driver_genes <- c(
+  # Core ccRCC tumour suppressor; loss drives HIF/hypoxia and
+  # angiogenesis biology.
+  "VHL",
+
+  # Chromatin-remodelling tumour suppressor frequently mutated in ccRCC.
+  "PBRM1",
+
+  # Tumour suppressor associated with more aggressive ccRCC and
+  # poorer prognosis.
+  "BAP1",
+
+  # Chromatin/histone methyltransferase gene altered in ccRCC.
+  "SETD2",
+
+  # Chromatin-regulation gene recurrently altered in ccRCC.
+  "KDM5C",
+
+  # Kinase pathway gene; links to PI3K/AKT/mTOR signalling and
+  # targeted therapy.
+  "MTOR",
+
+  # Negative regulator of PI3K/AKT signalling; recurrently altered
+  # in ccRCC.
+  "PTEN",
+
+  # mTOR pathway regulator; TSC1/TSC2/MTOR mutations linked to
+  # rapalog response.
+  "TSC1",
+
+  # mTOR pathway regulator; functions with TSC1 to suppress
+  # mTORC1 signalling.
+  "TSC2"
+)
+
 
 # Multi-Omics Data Layout Paths ------------------------------------------------
 # Build project-relative paths to the local cBioPortal data files.
@@ -193,4 +232,3 @@ if (length(missing_files) > 0L) {
 
 message("All data files found.")
 message("Package setup complete.")
-# message("Working study ID: ", study_id)
