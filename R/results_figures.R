@@ -90,7 +90,10 @@ if (length(clinical_cindex) == 0L) {
   clinical_cindex <- 0.751 # Safe fallback if clinical model result is missing
 }
 
+best_model <- cv_results$model[1]
+
 cindex_comparison_plot <- plot_cv_df |>
+
   ggplot2::ggplot(
     ggplot2::aes(x = .data$clean_label, y = .data$cv_concordance)
   ) +
@@ -110,7 +113,7 @@ cindex_comparison_plot <- plot_cv_df |>
   ) +
   # C-index point estimates; best model highlighted in red
   ggplot2::geom_point(
-    ggplot2::aes(colour = (.data$model == "RNA_Path")),
+    ggplot2::aes(colour = (.data$model == best_model)),
     size = 4L, show.legend = FALSE
   ) +
   ggplot2::scale_colour_manual(
@@ -149,7 +152,7 @@ save_pipeline_plot(
   plot_object = cindex_comparison_plot,
   file_path   = "figures/model_cindex_comparison.png",
   width       = 1000L,
-  height      = 550L,
+  height      = 650L,
   resolution  = 100L
 )
 
@@ -242,10 +245,12 @@ forest_plot <- plot_coefs_df |>
   ggplot2::geom_point(
     ggplot2::aes(fill = (.data$hazard_ratio > 1.0)),
     shape = 21, size = 3L, stroke = 0.5, colour = "#2c3e50",
-    show.legend = FALSE
+    show.legend = TRUE
   ) +
   ggplot2::scale_fill_manual(
-    values = c("TRUE" = "#e74c3c", "FALSE" = "#2ecc71")
+    values = c("TRUE" = "#e74c3c", "FALSE" = "#2ecc71"),
+    labels = c("TRUE" = "Increased risk (HR > 1)", "FALSE" = "Decreased risk (HR < 1)"),
+    name   = NULL
   ) +
   # Log scale so distances above and below HR = 1 are symmetric
   ggplot2::scale_y_log10(
@@ -268,6 +273,12 @@ forest_plot <- plot_coefs_df |>
   ) +
   ggplot2::theme_classic(base_size = 12L) +
   ggplot2::theme(
+    legend.position      = c(0.97, 0.04),
+    legend.justification = c("right", "bottom"),
+    legend.background    = ggplot2::element_rect(
+      fill   = ggplot2::alpha("white", 0.8),
+      colour = NA
+    ),
     plot.title = ggplot2::element_text(
       face = "bold", size = 14L, colour = "#2c3e50"
     ),
@@ -339,7 +350,7 @@ overview_plot <- overview_plot_data |>
   ggplot2::labs(
     title    = "Clinical variable screening: univariable Cox regression",
     subtitle = "BH-adjusted p-values; dashed line = 0.05 threshold",
-    x        = "-log\u2081\u2080 (BH-adjusted p-value)",
+    x = expression(-log[10] ~ "(BH-adjusted p-value)"),
     y        = NULL
   ) +
   ggplot2::theme_classic(base_size = 12L) +
@@ -351,8 +362,8 @@ overview_plot <- overview_plot_data |>
 save_pipeline_plot(
   plot_object = overview_plot,
   file_path   = "figures/clinical_screening_overview.png",
-  width       = 900L,
-  height      = 600L,
+  width       = 1200L,
+  height      = 800L,
   resolution  = 120L
 )
 
@@ -411,10 +422,12 @@ if (nrow(forest_data) > 0L) {
       size        = 3L,
       stroke      = 0.5,
       colour      = "#2c3e50",
-      show.legend = FALSE
+      show.legend = FALSE # don't need a legend here
     ) +
     ggplot2::scale_fill_manual(
-      values = c("TRUE" = "#e74c3c", "FALSE" = "#2ecc71")
+      values = c("TRUE" = "#e74c3c", "FALSE" = "#2ecc71"),
+      #labels = c("TRUE" = "Increased risk (HR > 1)", "FALSE" = "Decreased risk (HR < 1)"),
+      name   = NULL
     ) +
     # Log scale so distances above and below HR = 1 are symmetric
     ggplot2::scale_x_log10(
@@ -435,9 +448,9 @@ if (nrow(forest_data) > 0L) {
   save_pipeline_plot(
     plot_object = clinical_forest_plot,
     file_path   = "figures/clinical_screening_selected.png",
-    width       = 900L,
+    width       = 1200L,
     # Scale height so labels never overlap regardless of how many terms exist
-    height      = max(400L, 60L * nrow(forest_data)),
+    height      = max(600L, 80L * nrow(forest_data)),
     resolution  = 120L
   )
 

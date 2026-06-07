@@ -138,7 +138,6 @@ save_pipeline_plot <- function(plot_object,
                                width,
                                height,
                                resolution = 72) {
-  # Open the PNG file device to capture the high-resolution plot on disk
   grDevices::png(
     filename = file_path,
     width    = width,
@@ -146,22 +145,20 @@ save_pipeline_plot <- function(plot_object,
     res      = resolution
   )
 
-  # Handle survminer object wrapper separation safely
+  # Print the full ggsurvplot object so survminer's own print method
+  # combines the KM curve and risk table via gridExtra before writing to disk.
+  # Previously this branch called print(plot_object$plot), which silently
+  # dropped the risk table.
   if (inherits(plot_object, "ggsurvplot")) {
-    print(plot_object$plot)
+    print(plot_object)        # was: print(plot_object$plot)
   } else {
     print(plot_object)
   }
 
-  # Close the file device to finish writing and save the PNG file
   grDevices::dev.off()
 
-  # Print the plot a second time to send it to the active R graphics canvas
-  if (inherits(plot_object, "ggsurvplot")) {
-    print(plot_object)
-  } else {
-    print(plot_object)
-  }
+  # Second print sends the combined figure to the interactive viewer as well.
+  print(plot_object)
 }
 
 # Standardise TCGA sample barcodes to a uniform 15-character hyphenated format

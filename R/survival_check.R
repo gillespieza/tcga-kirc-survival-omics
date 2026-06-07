@@ -244,6 +244,27 @@ overall_km_plot <- survminer::ggsurvplot( # Create KM plot object with survminer
   tables.theme = theme_classic()
 )
 
+# Label the median dashed line with the estimated survival time.
+# The annotation is placed at the foot of the vertical median line,
+# nudged right so the text clears the dashed line itself.
+# Guarded against NA — if fewer than 50 % of patients have experienced
+# the event, no median is estimable and survminer draws no line.
+if (!is.na(median_survival_months)) {
+  overall_km_plot$plot <- overall_km_plot$plot +
+    ggplot2::annotate(
+      "text",
+      x      = median_survival_months,   # sit on the vertical dashed line
+      y      = 0.05,                     # near the x-axis, above zero
+      label  = paste0(
+        "Median: ",
+        round(median_survival_months, 1L),
+        " months"
+      ),
+      hjust  = -0.05,   # push text to the right of the line
+      size   = 3.5,
+      colour = "grey40"
+    )
+}
 
 save_pipeline_plot(
   plot_object = overall_km_plot,
