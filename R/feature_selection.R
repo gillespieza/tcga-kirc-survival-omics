@@ -234,7 +234,7 @@ if (length(selected_rppa_features) == 0L) {
 # expected outcome, since clinical dominance has been eliminated from the LASSO.
 if (length(selected_rppa_features) == 0L) {
   warning(
-    "\u26a0\ufe0f LASSO shrunk all protein coefficients to zero at lambda.min. ",
+    "\u26a0\ufe0f LASSO shrunk all protein coefficients to zero at lambda.min.",
     "Falling back to the top 5 most robust univariable prognostic markers.",
     call. = FALSE
   )

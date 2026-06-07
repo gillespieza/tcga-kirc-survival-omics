@@ -150,7 +150,7 @@ save_pipeline_plot <- function(plot_object,
   # Previously this branch called print(plot_object$plot), which silently
   # dropped the risk table.
   if (inherits(plot_object, "ggsurvplot")) {
-    print(plot_object)        # was: print(plot_object$plot)
+    print(plot_object) # was: print(plot_object$plot)
   } else {
     print(plot_object)
   }

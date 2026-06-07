@@ -253,15 +253,15 @@ if (!is.na(median_survival_months)) {
   overall_km_plot$plot <- overall_km_plot$plot +
     ggplot2::annotate(
       "text",
-      x      = median_survival_months,   # sit on the vertical dashed line
-      y      = 0.05,                     # near the x-axis, above zero
-      label  = paste0(
+      x = median_survival_months, # sit on the vertical dashed line
+      y = 0.05, # near the x-axis, above zero
+      label = paste0(
         "Median: ",
         round(median_survival_months, 1L),
         " months"
       ),
-      hjust  = -0.05,   # push text to the right of the line
-      size   = 3.5,
+      hjust = -0.05, # push text to the right of the line
+      size = 3.5,
       colour = "grey40"
     )
 }

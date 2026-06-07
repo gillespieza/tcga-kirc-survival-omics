@@ -148,23 +148,23 @@ candidate_col_map <- tibble::tibble(
     # --- Standard clinical covariates ---
     "AGE",
     "SEX",
-    "WEIGHT",                                     # body weight; obesity linked to RCC outcomes
+    "WEIGHT", # body weight; obesity linked to RCC outcomes
 
     # --- Pathological staging ---
-    "AJCC_PATHOLOGIC_TUMOR_STAGE",                # composite AJCC stage (screened alongside TNM)
-    "PATH_T_STAGE",                               # TNM T: primary tumour size and local invasion
-    "PATH_N_STAGE",                               # TNM N: regional lymph node involvement
-    "PATH_M_STAGE",                               # TNM M: distant metastasis
-    "GRADE",                                      # histological nuclear grade
+    "AJCC_PATHOLOGIC_TUMOR_STAGE", # composite AJCC stage (screened alongside TNM)
+    "PATH_T_STAGE", # TNM T: primary tumour size and local invasion
+    "PATH_N_STAGE", # TNM N: regional lymph node involvement
+    "PATH_M_STAGE", # TNM M: distant metastasis
+    "GRADE", # histological nuclear grade
 
     # --- Genomic instability and mutational burden ---
-    "ANEUPLOIDY_SCORE",                           # chromosomal instability; somatic copy-number burden
-    "TBL_SCORE",                                  # tumour break load; structural variant burden
-    "TMB_NONSYNONYMOUS",                          # tumour mutational burden; non-synonymous somatic variants
+    "ANEUPLOIDY_SCORE", # chromosomal instability; somatic copy-number burden
+    "TBL_SCORE", # tumour break load; structural variant burden
+    "TMB_NONSYNONYMOUS", # tumour mutational burden; non-synonymous somatic variants
 
     # --- Microsatellite instability ---
-    "MSI_SCORE_MANTIS",                           # MSI score from MANTIS algorithm
-    "MSI_SENSOR_SCORE"                            # MSI score from MSIsensor algorithm
+    "MSI_SCORE_MANTIS", # MSI score from MANTIS algorithm
+    "MSI_SENSOR_SCORE" # MSI score from MSIsensor algorithm
   ),
   output_name = c(
     "age",
@@ -182,19 +182,19 @@ candidate_col_map <- tibble::tibble(
     "msi_sensor_score"
   ),
   col_type = c(
-    "numeric",        # age
-    "factor",         # sex
-    "numeric",        # weight
+    "numeric", # age
+    "factor", # sex
+    "numeric", # weight
     "factor_special", # stage — explicit levels applied below
-    "factor",         # path_t_stage
-    "factor",         # path_n_stage
-    "factor",         # path_m_stage
+    "factor", # path_t_stage
+    "factor", # path_n_stage
+    "factor", # path_m_stage
     "factor_special", # grade — G1/G2 collapse applied below
-    "numeric",        # aneuploidy_score
-    "numeric",        # tbl_score
-    "numeric",        # tmb_nonsynonymous
-    "numeric",        # msi_score_mantis
-    "numeric"         # msi_sensor_score
+    "numeric", # aneuploidy_score
+    "numeric", # tbl_score
+    "numeric", # tmb_nonsynonymous
+    "numeric", # msi_score_mantis
+    "numeric" # msi_sensor_score
   )
 )
 
@@ -225,7 +225,7 @@ rename_map <- stats::setNames(
 )
 
 # Identify output names by type for use in across() calls below.
-numeric_cols  <- available_candidates$output_name[
+numeric_cols <- available_candidates$output_name[
   available_candidates$col_type == "numeric"
 ]
 plain_factor_cols <- available_candidates$output_name[
@@ -274,9 +274,9 @@ clinical_survival <- clinical_data |>
   # Step 1: Derive outcome and standardised ID columns from raw values.
   dplyr::mutate(
     patient_id = .data$PATIENT_ID,
-    sample_id  = standardise_sample_id(.data$SAMPLE_ID),
-    os_months  = as.numeric(.data$OS_MONTHS),
-    os_event   = dplyr::case_when(
+    sample_id = standardise_sample_id(.data$SAMPLE_ID),
+    os_months = as.numeric(.data$OS_MONTHS),
+    os_event = dplyr::case_when(
       is.na(.data$OS_STATUS) ~ NA_integer_,
       stringr::str_detect(
         .data$OS_STATUS,
@@ -328,9 +328,9 @@ clinical_survival <- clinical_data |>
     dplyr::across(
       dplyr::any_of("grade"),
       ~ dplyr::case_when(
-        .x == "GX"             ~ NA_character_,
+        .x == "GX" ~ NA_character_,
         .x %in% c("G1", "G2") ~ "G1/G2",
-        TRUE                   ~ as.character(.x)
+        TRUE ~ as.character(.x)
       ) |>
         factor(levels = grade_levels, ordered = FALSE) |>
         droplevels()

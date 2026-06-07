@@ -124,11 +124,10 @@ abort_if_false(
 #      many levels a factor has, which is needed for BH correction.
 #   5. Extract per-term HRs and CIs from broom::tidy() for the forest plot.
 
-summary_list <- list()  # one entry per variable (for BH correction)
-detail_list  <- list()  # one entry per term (for forest plot)
+summary_list <- list() # one entry per variable (for BH correction)
+detail_list <- list() # one entry per term (for forest plot)
 
 for (var in screenable_cols) {
-
   col <- clinical_survival[[var]]
 
   # Collapse sparse factor levels to NA before fitting
@@ -155,7 +154,11 @@ for (var in screenable_cols) {
 
   # Skip if too few observations or events after dropping NAs
   if (nrow(model_data) < 30L || sum(model_data$os_event) < 5L) {
-    message("  Skipping '", var, "': too few complete cases or events after NA removal.")
+    message(
+      "  Skipping '",
+      var,
+      "': too few complete cases or events after NA removal."
+    )
     next
   }
 
@@ -167,7 +170,13 @@ for (var in screenable_cols) {
       ties = "efron"
     ),
     error = function(e) {
-      message("  Skipping '", var, "': Cox model failed (", conditionMessage(e), ").")
+      message(
+        "  Skipping '",
+        var,
+        "': Cox model failed (",
+        conditionMessage(e),
+        ")."
+      )
       NULL
     }
   )
@@ -223,7 +232,7 @@ clinical_univariable_results <- dplyr::bind_rows(summary_list) |>
   dplyr::mutate(
     # BH correction across all screened variables
     p_adjust_bh = stats::p.adjust(.data$p_value, method = "BH"),
-    significant  = .data$p_adjust_bh < 0.05
+    significant = .data$p_adjust_bh < 0.05
   ) |>
   dplyr::arrange(.data$p_adjust_bh)
 
@@ -239,7 +248,15 @@ message(
 
 print(
   clinical_univariable_results |>
-    dplyr::select(variable, variable_type, n, events, p_value, p_adjust_bh, significant)
+    dplyr::select(
+      variable,
+      variable_type,
+      n,
+      events,
+      p_value,
+      p_adjust_bh,
+      significant
+    )
 )
 
 
@@ -250,13 +267,13 @@ print(
 # to prevent collinearity in downstream multivariable models. Only composite
 # stage is retained as the clinically interpretable summary variable.
 
-tnm_components  <- c("path_t_stage", "path_n_stage", "path_m_stage")
-sig_vars        <- clinical_univariable_results$variable[
+tnm_components <- c("path_t_stage", "path_n_stage", "path_m_stage")
+sig_vars <- clinical_univariable_results$variable[
   clinical_univariable_results$significant
 ]
 
 composite_stage_sig <- "stage" %in% sig_vars
-tnm_sig             <- intersect(tnm_components, sig_vars)
+tnm_sig <- intersect(tnm_components, sig_vars)
 
 if (composite_stage_sig && length(tnm_sig) > 0L) {
   message(
