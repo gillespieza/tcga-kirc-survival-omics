@@ -1,5 +1,5 @@
 ============================================================
-Pipeline run started: 2026-06-06 15:48:39.181261
+Pipeline run started: 2026-06-07 11:56:57.033548
 ============================================================
 ------------------------------------------------------------
 Step: Validation error helpers (`R/utils_validation.R`)
@@ -14,7 +14,7 @@ Step: Package setup and configuration (`R/setup.R`)
 
 [MESSAGE] Package setup complete.
 
-Completed Package setup and configuration in 140 ms.
+Completed Package setup and configuration in 50 ms.
 ------------------------------------------------------------
 Step: Load raw cBioPortal data (`R/load_data.R`)
 ------------------------------------------------------------
@@ -33,7 +33,7 @@ Step: Load raw cBioPortal data (`R/load_data.R`)
 [MESSAGE] 
 All data files loaded successfully.
 
-Completed Load raw cBioPortal data in 11.28 s.
+Completed Load raw cBioPortal data in 3.57 s.
 ------------------------------------------------------------
 Step: Prepare clinical survival table (`R/prepare_clinical.R`)
 ------------------------------------------------------------
@@ -41,9 +41,33 @@ Step: Prepare clinical survival table (`R/prepare_clinical.R`)
 
 [MESSAGE] Removed 0 record(s) with missing os_months or os_event.
 
+[MESSAGE] Candidate clinical predictors available for screening: 15 (age, sex, weight, prior_dx, lymph_node_assessment, stage, path_t_stage, path_n_stage, path_m_stage, grade, aneuploidy_score, tbl_score, tmb_nonsynonymous, msi_score_mantis, msi_sensor_score)
+
 [MESSAGE] Clinical survival table prepared.
 
-Completed Prepare clinical survival table in 370 ms.
+Completed Prepare clinical survival table in 60 ms.
+------------------------------------------------------------
+Step: Screen for predictors (`R/screen_clinical.R`)
+------------------------------------------------------------
+[MESSAGE] Screening 15 candidate clinical variable(s) by univariable Cox regression ...
+
+[MESSAGE] 1 candidate(s) dropped before screening (constant, near-constant, or insufficient group size): weight
+
+[MESSAGE] Screening complete: 8 of 14 variables passed BH-adjusted p < 0.05.
+
+[MESSAGE] TNM collinearity resolution: composite stage is significant alongside path_t_stage, path_n_stage, path_m_stage. Dropping individual TNM components and retaining composite stage only.
+
+[MESSAGE] Selected clinical features (5): stage, grade, tbl_score, age, lymph_node_assessment
+
+[MESSAGE] Saved clinical screening overview plot.
+
+[MESSAGE] [38;5;232m`height` was translated to `width`.[39m
+[MESSAGE] [38;5;232m`height` was translated to `width`.[39m
+[MESSAGE] Saved selected clinical features forest plot.
+
+[MESSAGE] Clinical screening complete. 5 feature(s) selected for downstream modelling: stage, grade, tbl_score, age, lymph_node_assessment
+
+Completed Screen for predictors in 2.8 s.
 ------------------------------------------------------------
 Step: Prepare RPPA proteomics data (`R/prepare_rppa.R`)
 ------------------------------------------------------------
@@ -51,7 +75,7 @@ Step: Prepare RPPA proteomics data (`R/prepare_rppa.R`)
 
 [MESSAGE] RPPA proteomics table prepared: 455 samples x 198 features. 3.5% missing values.
 
-Completed Prepare RPPA proteomics data in 3.84 s.
+Completed Prepare RPPA proteomics data in 1.95 s.
 ------------------------------------------------------------
 Step: Prepare RNA-seq data (`R/prepare_rnaseq.R`)
 ------------------------------------------------------------
@@ -89,7 +113,7 @@ Step: Prepare RNA-seq data (`R/prepare_rnaseq.R`)
 
 [MESSAGE] Total genes retained: 3923
 
-Completed Prepare RNA-seq data in 18.5 s.
+Completed Prepare RNA-seq data in 10.81 s.
 ------------------------------------------------------------
 Step: Prepare binary mutation features (`R/prepare_mutations.R`)
 ------------------------------------------------------------
@@ -97,7 +121,7 @@ Step: Prepare binary mutation features (`R/prepare_mutations.R`)
 
 [MESSAGE] Mutation feature table prepared: 275 samples x 9 driver gene features.
 
-Completed Prepare binary mutation features in 470 ms.
+Completed Prepare binary mutation features in 190 ms.
 ------------------------------------------------------------
 Step: Prepare binary CNA features (`R/prepare_cna.R`)
 ------------------------------------------------------------
@@ -105,12 +129,12 @@ Step: Prepare binary CNA features (`R/prepare_cna.R`)
 
 [MESSAGE] Evaluating cohort prevalence across available alterations...
 
-[WARNING] Prepare binary CNA features: ⚠️ No focal CNA features passed the strict 5% prevalence filter.
+[WARNING] Prepare binary CNA features: ⚠️ No focal CNA features passed the strict 5% prevalence filter
 [MESSAGE] --> Engaging Tier 2 Fallback: Relaxing threshold to >= 2% to retain available genomic signal.
 
 [MESSAGE] CNA preparation complete. Isolated 4 stable focal feature(s).
 
-Completed Prepare binary CNA features in 590 ms.
+Completed Prepare binary CNA features in 320 ms.
 ------------------------------------------------------------
 Step: Integrate multiomics data layers (`R/integrate_data.R`)
 ------------------------------------------------------------
@@ -122,17 +146,17 @@ Step: Integrate multiomics data layers (`R/integrate_data.R`)
 
 [MESSAGE] Mutation summary:
 
-Completed Integrate multiomics data layers in 1.01 s.
+Completed Integrate multiomics data layers in 490 ms.
 ------------------------------------------------------------
-Step: Baseline cohort survival check (`R/quick_survival_check.R`)
+Step: Baseline cohort survival check (`R/survival_check.R`)
 ------------------------------------------------------------
 [MESSAGE] Overall survival summary:
 
-[MESSAGE] 4 sample(s) dropped to establish a unified complete-case dataset.
+[MESSAGE] 10 sample(s) dropped to establish a unified complete-case dataset.
 
-[MESSAGE] Clinical Cox C-index: 0.778
+[MESSAGE] Clinical Cox C-index: 0.783
 
-[MESSAGE] Clinical Cox model complete cases: 450
+[MESSAGE] Clinical Cox model complete cases: 444
 
 [MESSAGE] Clinical Cox results:
 
@@ -141,13 +165,13 @@ Step: Baseline cohort survival check (`R/quick_survival_check.R`)
 [WARNING] Baseline cohort survival check: One or more covariates show evidence of non-proportional hazards. Consider time-varying coefficients or a stratified Cox model.
 [MESSAGE] Saved overall KM plot to figures/overall_kaplan_meier.png
 
-Completed Baseline cohort survival check in 3.89 s.
+Completed Baseline cohort survival check in 2.31 s.
 ------------------------------------------------------------
 Step: Screen RPPA: multivariable LASSO (`R/feature_selection.R`)
 ------------------------------------------------------------
 [MESSAGE] Running univariable screening across all valid proteomic markers ...
 
-[MESSAGE] Number of complete cases for multivariable regularisation: 450
+[MESSAGE] Number of complete cases for multivariable regularisation: 444
 
 [MESSAGE] Fitting cross-validated multivariable LASSO Cox model ...
 
@@ -156,7 +180,7 @@ Step: Screen RPPA: multivariable LASSO (`R/feature_selection.R`)
 [WARNING] Screen RPPA: multivariable LASSO: ⚠️ LASSO shrunk all protein coefficients to zero at lambda.min due to clinical dominance. Falling back to the top 5 most robust univariable prognostic markers to guarantee pipeline continuity.
 [MESSAGE] RPPA feature selection complete: Isolated 5 robust prognostic protein markers.
 
-Completed Screen RPPA: multivariable LASSO in 7.06 s.
+Completed Screen RPPA: multivariable LASSO in 4.45 s.
 ------------------------------------------------------------
 Step: Calculate RNA pathway scores (`R/pathway_scores.R`)
 ------------------------------------------------------------
@@ -164,19 +188,19 @@ Step: Calculate RNA pathway scores (`R/pathway_scores.R`)
 
 [MESSAGE] Running Engine 2: Executing unbiased genome-wide univariable screening...
 
-[MESSAGE] ☕ Launching parallel cluster over 23 cores for 3923 target transcripts...
+[MESSAGE] ☕ Launching parallel cluster over 7 cores for 3923 target transcripts...
 
 [MESSAGE] Isolated the top 20 most significant data-driven genes. Top 3: COL7A1, ZIC2, STX1A
 
 [MESSAGE] Pathway scoring and data-driven RNA selection complete.
 
-Completed Calculate RNA pathway scores in 22.38 s.
+Completed Calculate RNA pathway scores in 14.34 s.
 ------------------------------------------------------------
 Step: Compare cross-validated models (`R/survival_models.R`)
 ------------------------------------------------------------
 [MESSAGE] === Modelling Feature Dimensions ===
 
-[MESSAGE] Clinical Covariates    : 4
+[MESSAGE] Clinical Covariates    : 5
 
 [MESSAGE] Somatic Mutations      : 6
 
@@ -190,9 +214,9 @@ Step: Compare cross-validated models (`R/survival_models.R`)
 
 [MESSAGE] ====================================
 
-[MESSAGE] Total complete-case samples available for 5-fold cross-validation: 310
+[MESSAGE] Total complete-case samples available for 5-fold cross-validation: 304
 
-[MESSAGE] Executing stratified 5-fold cross-validation loop with invariance guards...
+[MESSAGE] Executing stratified 5-fold cross-validation loop + invariance guards
 
 [MESSAGE] 
 === Cross-Validated Model Comparison Summary ===
@@ -201,10 +225,10 @@ Step: Compare cross-validated models (`R/survival_models.R`)
 
 [MESSAGE] Fitting final integrated model on full complete-case cohort...
 
-[WARNING] Compare cross-validated models: Loglik converged before variable  15,16,17 ; coefficient may be infinite. 
-[MESSAGE] Survival modelling complete. Model objects held in memory and exported.
+[WARNING] Compare cross-validated models: Loglik converged before variable  16,17,18 ; coefficient may be infinite. 
+[MESSAGE] Survival modelling complete. Model objects held in memory + exported.
 
-Completed Compare cross-validated models in 1.25 s.
+Completed Compare cross-validated models in 1.09 s.
 ------------------------------------------------------------
 Step: Create report-ready outputs (`R/results_figures.R`)
 ------------------------------------------------------------
@@ -214,7 +238,7 @@ Step: Create report-ready outputs (`R/results_figures.R`)
 
 [MESSAGE] Publication figures successfully generated and saved to /figures.
 
-Completed Create report-ready outputs in 3.45 s.
+Completed Create report-ready outputs in 2.08 s.
 ============================================================
-Pipeline complete. Total time: 74.72 s.
+Pipeline complete. Total time: 44.86 s.
 ============================================================

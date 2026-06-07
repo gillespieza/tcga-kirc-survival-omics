@@ -1,36 +1,71 @@
 # Prepare clinical survival data ----------------------------------------------
 #
 # Merges sample-level and patient-level clinical tables into a single
-# analysis-ready survival tibble. Renames columns to tidy snake_case names,
-# coerces types, derives the overall survival event indicator, encodes
-# categorical variables as ordered or unordered factors with explicit levels,
-# removes records with missing survival information, and prints a summary of
-# the resulting cohort.
+# analysis-ready survival tibble. Renames all candidate clinical columns to
+# tidy snake_case names, coerces types, derives the overall survival event
+# indicator, encodes categorical variables as factors, and removes records
+# with missing survival information.
+#
+# Unlike the previous fixed-column approach, this script retains all candidate
+# clinical and molecular variables for downstream univariable Cox screening in
+# screen_clinical.R. The fixed set of four covariates (age, sex, stage, grade)
+# has been replaced by a broader set of clinical candidates.
+#
+# Excluded variables and reasons:
+#   - Identifiers/admin:
+#       PATIENT_ID, OTHER_PATIENT_ID, CANCER_TYPE_ACRONYM, AJCC_STAGING_EDITION,
+#       FORM_COMPLETION_DATE, INFORMED_CONSENT_VERIFIED,
+#       IN_PANCANPATHWAYS_FREEZE, ICD_10, ICD_O_3_HISTOLOGY, ICD_O_3_SITE,
+#       ONCOTREE_CODE, CANCER_TYPE, CANCER_TYPE_DETAILED, TUMOR_TYPE,
+#       TISSUE_SOURCE_SITE_CODE, TISSUE_SOURCE_SITE, SOMATIC_STATUS, SAMPLE_ID
+#   - Outcome variables (circular):
+#       OS_STATUS, OS_MONTHS, DSS_STATUS/MONTHS, DFS_STATUS/MONTHS,
+#       PFS_STATUS/MONTHS, DAYS_LAST_FOLLOWUP
+#   - Redundant with AGE:
+#       DAYS_TO_BIRTH, DAYS_TO_INITIAL_PATHOLOGIC_DIAGNOSIS
+#   - Post-baseline/data leakage:
+#       PERSON_NEOPLASM_CANCER_STATUS, NEW_TUMOR_EVENT_AFTER_INITIAL_TREATMENT
+#   - Constant in TCGA-KIRC (zero variance):
+#       TUMOR_TISSUE_SITE (all kidney), SAMPLE_TYPE (all primary tumour),
+#       SUBTYPE (all KIRC)
+#   - Near-constant in TCGA-KIRC:
+#       RADIATION_THERAPY, HISTORY_NEOADJUVANT_TRTYN
+#   - Socioeconomic/healthcare confounders:
+#       ETHNICITY, RACE, GENETIC_ANCESTRY_LABEL
+#   - Collection process artefacts (selection bias, not biology):
+#       TISSUE_PROSPECTIVE_COLLECTION_INDICATOR,
+#       TISSUE_RETROSPECTIVE_COLLECTION_INDICATOR
+#
+# NOTE on TNM vs composite stage: PATH_T_STAGE, PATH_N_STAGE, PATH_M_STAGE,
+# and AJCC_PATHOLOGIC_TUMOR_STAGE are all retained as candidates. They are
+# screened independently in screen_clinical.R; if multiple TNM components
+# survive BH correction, only the composite stage is retained in the final
+# model to avoid collinearity.
 #
 # Requires: load_data.R to have been sourced so that clinical_patient and
 #           clinical_sample are available in the global environment.
 #
 # Produces:
-# clinical_data             - Wide tibble from left-joining clinical_patient
-#                             onto clinical_sample by PATIENT_ID. One row
-#                             per sample.
-# clinical_survival         - Analysis-ready survival tibble with tidy column
-#                             names. Records with missing os_months or
-#                             os_event are dropped. One row per sample.
-#                             Columns:
-#                               patient_id - TCGA patient barcode
-#                               sample_id  - TCGA sample barcode
-#                               os_months  - Overall survival time (months)
-#                               os_event   - Event indicator (1 = death,
-#                                            0 = censored)
-#                               age        - Age at diagnosis (years)
-#                               sex        - Factor
-#                               stage      - Unordered factor
-#                                            (STAGEs I, II, III, IV)
-#                               grade      - Unordered factor (G1/G2, G3, G4);
-#                                            GX (not assessable) recoded to NA
-# clinical_survival_summary - Single-row tibble of patient/event counts and
-#                             median follow-up duration.
+#   clinical_survival         - Analysis-ready tibble. One row per sample.
+#                               Outcome columns: patient_id, sample_id,
+#                               os_months, os_event.
+#                               Candidate predictor columns (snake_case):
+#                               age, sex, stage, path_t_stage, path_n_stage,
+#                               path_m_stage, weight, subtype, ethnicity,
+#                               race, genetic_ancestry_label,
+#                               radiation_therapy, neoadjuvant_treatment,
+#                               prior_dx, lymph_node_assessment, grade,
+#                               aneuploidy_score, msi_score_mantis,
+#                               msi_sensor_score, tmb_nonsynonymous,
+#                               tbl_score, tissue_prospective_collection,
+#                               tissue_retrospective_collection,
+#                               tumor_tissue_site, sample_type.
+#   clinical_candidate_cols   - Character vector of candidate predictor column
+#                               names present in clinical_survival. Used by
+#                               screen_clinical.R and downstream modelling
+#                               scripts to identify clinical columns to screen.
+#   clinical_survival_summary - Single-row tibble of patient/event counts and
+#                               median follow-up duration.
 #
 # Usage: this script is intended to be sourced by run_analysis.R as part of
 #        the full pipeline, not run directly.
@@ -56,13 +91,12 @@ if (!all(c("PATIENT_ID", "SAMPLE_ID") %in% names(clinical_sample))) {
 
 # Combine Patient-Level and Sample-Level Clinical Data -------------------------
 
-# Check how many rows we had before the join, so we can compare after the join
-# and check for unexpected changes in row count that might suggest issues with
-# the join keys (e.g. non-unique PATIENT_ID in clinical_patient).
+# Record row count before joining to detect unexpected duplications.
 n_samples_before <- nrow(clinical_sample)
 
-# Join clinical sample data and clinical data, matching by PATIENT_ID.
-# This will add patient-level data to each sample row.
+# Left join keeps clinical_sample as the anchor (one row per sample).
+# Patient-level variables including survival outcomes are added from
+# clinical_patient via PATIENT_ID.
 clinical_data <- clinical_sample |>
   dplyr::left_join(clinical_patient, by = "PATIENT_ID")
 
@@ -76,23 +110,15 @@ if (nrow(clinical_data) != n_samples_before) {
   )
 }
 
-required_cols <- c(
-  "PATIENT_ID",
-  "SAMPLE_ID",
-  "OS_MONTHS",
-  "OS_STATUS",
-  "AGE",
-  "SEX",
-  "AJCC_PATHOLOGIC_TUMOR_STAGE",
-  "GRADE"
-)
+# Hard-check outcome columns — the pipeline cannot proceed without these.
+required_outcome_cols <- c("PATIENT_ID", "SAMPLE_ID", "OS_MONTHS", "OS_STATUS")
 
-missing_cols <- setdiff(required_cols, names(clinical_data))
+missing_outcome_cols <- setdiff(required_outcome_cols, names(clinical_data))
 
-if (length(missing_cols) > 0L) {
+if (length(missing_outcome_cols) > 0L) {
   stop(
-    "Joined clinical_data is missing expected column(s): ",
-    paste(missing_cols, collapse = ", "),
+    "Joined clinical_data is missing required outcome column(s): ",
+    paste(missing_outcome_cols, collapse = ", "),
     call. = FALSE
   )
 }
@@ -104,52 +130,151 @@ message(
 )
 
 
-# Prepare Clinical Survival Table ----------------------------------------------
+# Define Candidate Column Map --------------------------------------------------
+# Maps each raw cBioPortal column name to its tidy snake_case output name and
+# expected type. Columns absent from the joined data are silently skipped so
+# the script is portable across TCGA studies with different column coverage.
 
-stage_levels <- c("STAGE I", "STAGE II", "STAGE III", "STAGE IV")
+candidate_col_map <- tibble::tibble(
+  raw_name = c(
+    # --- Standard clinical covariates ---
+    "AGE",
+    "SEX",
+    "WEIGHT",                                     # body weight; obesity linked to RCC outcomes
+    "PRIOR_DX",                                   # prior cancer diagnosis
+    "PRIMARY_LYMPH_NODE_PRESENTATION_ASSESSMENT", # lymph node assessment at presentation
 
-# Adjusted factor levels: G1 and G2 are collapsed to resolve statistical
-# separation issues in Cox models, & to create a stable baseline reference group
-# for modelling the effect of grade on survival.
-grade_levels <- c("G1/G2", "G3", "G4")
+    # --- Pathological staging ---
+    "AJCC_PATHOLOGIC_TUMOR_STAGE",                # composite AJCC stage (screened alongside TNM)
+    "PATH_T_STAGE",                               # TNM T: primary tumour size and local invasion
+    "PATH_N_STAGE",                               # TNM N: regional lymph node involvement
+    "PATH_M_STAGE",                               # TNM M: distant metastasis
+    "GRADE",                                      # histological nuclear grade
 
-unexpected_stages <- setdiff(
-  unique(stats::na.omit(clinical_data$AJCC_PATHOLOGIC_TUMOR_STAGE)),
-  stage_levels
+    # --- Genomic instability and mutational burden ---
+    "ANEUPLOIDY_SCORE",                           # chromosomal instability; somatic copy-number burden
+    "TBL_SCORE",                                  # tumour break load; structural variant burden
+    "TMB_NONSYNONYMOUS",                          # tumour mutational burden; non-synonymous somatic variants
+
+    # --- Microsatellite instability ---
+    "MSI_SCORE_MANTIS",                           # MSI score from MANTIS algorithm
+    "MSI_SENSOR_SCORE"                            # MSI score from MSIsensor algorithm
+  ),
+  output_name = c(
+    "age",
+    "sex",
+    "weight",
+    "prior_dx",
+    "lymph_node_assessment",
+    "stage",
+    "path_t_stage",
+    "path_n_stage",
+    "path_m_stage",
+    "grade",
+    "aneuploidy_score",
+    "tbl_score",
+    "tmb_nonsynonymous",
+    "msi_score_mantis",
+    "msi_sensor_score"
+  ),
+  col_type = c(
+    "numeric",        # age
+    "factor",         # sex
+    "numeric",        # weight
+    "factor",         # prior_dx
+    "factor",         # lymph_node_assessment
+    "factor_special", # stage — explicit levels applied below
+    "factor",         # path_t_stage
+    "factor",         # path_n_stage
+    "factor",         # path_m_stage
+    "factor_special", # grade — G1/G2 collapse applied below
+    "numeric",        # aneuploidy_score
+    "numeric",        # tbl_score
+    "numeric",        # tmb_nonsynonymous
+    "numeric",        # msi_score_mantis
+    "numeric"         # msi_sensor_score
+  )
 )
 
-unexpected_grades <- setdiff(
-  unique(stats::na.omit(clinical_data$GRADE)),
-  c("G1", "G2", "G3", "G4", "GX")
+# Restrict to columns actually present in the joined data.
+available_candidates <- candidate_col_map |>
+  dplyr::filter(.data$raw_name %in% names(clinical_data))
+
+skipped_candidates <- setdiff(
+  candidate_col_map$raw_name,
+  names(clinical_data)
 )
 
-if (length(unexpected_stages) > 0L) {
-  warning(
-    "Unexpected AJCC stage value(s) will be coerced to NA: ",
-    paste(unexpected_stages, collapse = ", "),
-    call. = FALSE
+if (length(skipped_candidates) > 0L) {
+  message(
+    length(skipped_candidates),
+    " candidate column(s) not found in the joined data and will be skipped: ",
+    paste(skipped_candidates, collapse = ", ")
   )
 }
 
-if (length(unexpected_grades) > 0L) {
-  warning(
-    "Unexpected GRADE value(s) will be coerced to NA: ",
-    paste(unexpected_grades, collapse = ", "),
-    call. = FALSE
+
+# Prepare Clinical Survival Table ----------------------------------------------
+# Build a named vector for dplyr::rename() in the format c(new = "old").
+
+rename_map <- stats::setNames(
+  available_candidates$raw_name,
+  available_candidates$output_name
+)
+
+# Identify output names by type for use in across() calls below.
+numeric_cols  <- available_candidates$output_name[
+  available_candidates$col_type == "numeric"
+]
+plain_factor_cols <- available_candidates$output_name[
+  available_candidates$col_type == "factor"
+]
+
+# Factor levels for variables with a known reference group.
+# GX (grade not assessable) is recoded to NA before factoring since it
+# cannot be meaningfully ranked alongside G1-G4 in a survival model.
+stage_levels <- c("STAGE I", "STAGE II", "STAGE III", "STAGE IV")
+grade_levels <- c("G1/G2", "G3", "G4")
+
+# Warn about unexpected raw values before coercion so the warning is
+# informative rather than appearing as silent NA introduction later.
+if ("AJCC_PATHOLOGIC_TUMOR_STAGE" %in% names(clinical_data)) {
+  unexpected_stages <- setdiff(
+    unique(stats::na.omit(clinical_data$AJCC_PATHOLOGIC_TUMOR_STAGE)),
+    stage_levels
   )
+  if (length(unexpected_stages) > 0L) {
+    warning(
+      "Unexpected AJCC stage value(s) will be coerced to NA: ",
+      paste(unexpected_stages, collapse = ", "),
+      call. = FALSE
+    )
+  }
+}
+
+if ("GRADE" %in% names(clinical_data)) {
+  unexpected_grades <- setdiff(
+    unique(stats::na.omit(clinical_data$GRADE)),
+    c("G1", "G2", "G3", "G4", "GX")
+  )
+  if (length(unexpected_grades) > 0L) {
+    warning(
+      "Unexpected GRADE value(s) will be coerced to NA: ",
+      paste(unexpected_grades, collapse = ", "),
+      call. = FALSE
+    )
+  }
 }
 
 n_before_filter <- nrow(clinical_data)
 
 clinical_survival <- clinical_data |>
-  dplyr::transmute(
+  # Step 1: Derive outcome and standardised ID columns from raw values.
+  dplyr::mutate(
     patient_id = .data$PATIENT_ID,
-    # Standardise IDs to a uniform 15-character format
-    sample_id = standardise_sample_id(.data$SAMPLE_ID),
-    # Force time metrics to numeric variables
-    os_months = as.numeric(.data$OS_MONTHS),
-    # Map overall survival event flags into a clean binary integer
-    os_event = dplyr::case_when(
+    sample_id  = standardise_sample_id(.data$SAMPLE_ID),
+    os_months  = as.numeric(.data$OS_MONTHS),
+    os_event   = dplyr::case_when(
       is.na(.data$OS_STATUS) ~ NA_integer_,
       stringr::str_detect(
         .data$OS_STATUS,
@@ -160,31 +285,56 @@ clinical_survival <- clinical_data |>
         stringr::regex("LIVING", ignore_case = TRUE)
       ) ~ 0L,
       TRUE ~ NA_integer_
-    ),
-    age = as.numeric(.data$AGE),
-    sex = factor(.data$SEX),
-    stage = factor(
-      .data$AJCC_PATHOLOGIC_TUMOR_STAGE,
-      levels  = stage_levels,
-      ordered = FALSE # Prevents polynomial contrasts in Cox models
-    ) |> droplevels(),
-
-    # Recode grade to collapse G1 + G2 into a stable baseline reference group
-    # GX (not assessable) is recoded to NA since it does not represent a
-    # meaningful biological category and would be difficult to interpret in
-    # survival models.
-    grade = dplyr::case_when(
-      .data$GRADE == "GX" ~ NA_character_,
-      .data$GRADE %in% c("G1", "G2") ~ "G1/G2",
-      TRUE ~ .data$GRADE
-    ) |>
-      factor(
-        levels  = grade_levels,
-        ordered = FALSE # Prevents polynomial contrasts in Cox models
-      ) |>
-      droplevels()
+    )
   ) |>
-  # Exclude patients with missing timeline details
+  # Step 2: Select outcome columns and all available raw candidate columns.
+  dplyr::select(
+    patient_id,
+    sample_id,
+    os_months,
+    os_event,
+    dplyr::all_of(available_candidates$raw_name)
+  ) |>
+  # Step 3: Rename raw candidate columns to tidy snake_case output names.
+  dplyr::rename(dplyr::all_of(rename_map)) |>
+  # Step 4: Coerce numeric candidate columns.
+  dplyr::mutate(
+    dplyr::across(
+      dplyr::any_of(numeric_cols),
+      as.numeric
+    )
+  ) |>
+  # Step 5: Coerce plain factor columns (no pre-specified levels).
+  # This covers TNM components, sex, race, ethnicity, etc.
+  dplyr::mutate(
+    dplyr::across(
+      dplyr::any_of(plain_factor_cols),
+      ~ factor(as.character(.x))
+    )
+  ) |>
+  # Step 6: Apply explicit factor levels to composite AJCC stage.
+  dplyr::mutate(
+    dplyr::across(
+      dplyr::any_of("stage"),
+      ~ factor(.x, levels = stage_levels, ordered = FALSE) |> droplevels()
+    )
+  ) |>
+  # Step 7: Collapse G1/G2 and apply explicit factor levels to grade.
+  # G1 and G2 are merged into a single reference group to prevent
+  # quasi-complete separation in Cox models (very few G1 events).
+  dplyr::mutate(
+    dplyr::across(
+      dplyr::any_of("grade"),
+      ~ dplyr::case_when(
+        .x == "GX"             ~ NA_character_,
+        .x %in% c("G1", "G2") ~ "G1/G2",
+        TRUE                   ~ as.character(.x)
+      ) |>
+        factor(levels = grade_levels, ordered = FALSE) |>
+        droplevels()
+    )
+  ) |>
+  # Step 8: Remove records where survival outcome is unknown.
   dplyr::filter(
     !is.na(.data$os_months),
     !is.na(.data$os_event)
@@ -196,6 +346,27 @@ message(
   "Removed ",
   n_dropped,
   " record(s) with missing os_months or os_event."
+)
+
+
+# Define Clinical Candidate Predictor Vector -----------------------------------
+# clinical_candidate_cols is a character vector of all candidate predictor
+# column names that are present in clinical_survival. It is used by
+# screen_clinical.R to know which columns to pass to univariable Cox models,
+# and by downstream modelling scripts to correctly exclude non-predictor columns
+# (patient_id, sample_id, os_months, os_event) from feature lists.
+
+clinical_candidate_cols <- intersect(
+  available_candidates$output_name,
+  names(clinical_survival)
+)
+
+message(
+  "Candidate clinical predictors available for screening: ",
+  length(clinical_candidate_cols),
+  " (",
+  paste(clinical_candidate_cols, collapse = ", "),
+  ")"
 )
 
 

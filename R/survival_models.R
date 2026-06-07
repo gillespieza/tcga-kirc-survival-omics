@@ -31,23 +31,27 @@
 
 check_required_objects(c(
   "survival_data",
+  "selected_clinical_features",
   "selected_rppa_features",
   "selected_mutation_features"
 ))
 
-required_base_cols <- c("os_months", "os_event", "age", "sex", "stage", "grade")
+required_base_cols <- c("os_months", "os_event", selected_clinical_features)
 check_has_columns("survival_data", required_base_cols)
 
 
 # Feature space discovery ------------------------------------------------------
 # Dynamically extract available multi-omics predictors using prefixes
 
-clinical_vars <- c("age", "sex", "stage", "grade")
+clinical_vars <- selected_clinical_features
+
 mutation_vars <- selected_mutation_features
+
 cna_vars <- names(survival_data)[stringr::str_starts(
   names(survival_data),
   "cna_"
 )]
+
 rppa_vars <- selected_rppa_features
 
 # Pull all 8 curated individual PC1 pathway scores (excluding means and
@@ -138,13 +142,15 @@ for (f in seq_len(n_folds)) {
     # events inside this specific fold training split
     stable_vars <- c()
     for (v in vars) {
-      if (v %in% c("age", "sex", "stage", "grade") ||
-            (is.numeric(train_fold[[v]]) &&
-               !all(train_fold[[v]] == train_fold[[v]][1L]))) {
+      if (v %in% selected_clinical_features ||
+          (is.numeric(train_fold[[v]]) &&
+           !all(train_fold[[v]] == train_fold[[v]][1L]))) {
         # Additional validation check for binary markers: ensure there are at
-        # least 2 events in each group to prevent quasi-separation
-        if (!v %in% c("age", "sex", "stage", "grade") &&
-              all(range(train_fold[[v]], na.rm = TRUE) == c(0L, 1L))) {
+        # least 2 events in each group to prevent quasi-separation.
+        # Clinical features are exempted from this check since they are not
+        # binary — selected_clinical_features replaces the old hardcoded list.
+        if (!v %in% selected_clinical_features &&
+            all(range(train_fold[[v]], na.rm = TRUE) == c(0L, 1L))) {
           events_in_mutated <- sum(
             train_fold$os_event[train_fold[[v]] == 1L],
             na.rm = TRUE

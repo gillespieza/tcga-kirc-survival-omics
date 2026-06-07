@@ -110,6 +110,7 @@ pipeline_steps <- tibble::tribble(
 
   # Phase 2: Individual Layer Data Cleaning (Isolation Stage)
   file.path("R", "prepare_clinical.R"),     "Prepare clinical survival table",
+  file.path("R", "screen_clinical.R"),      "Screen for predictors",
   file.path("R", "prepare_rppa.R"),         "Prepare RPPA proteomics data",
   file.path("R", "prepare_rnaseq.R"),       "Prepare RNA-seq data",
   file.path("R", "prepare_mutations.R"),    "Prepare binary mutation features",
@@ -117,7 +118,7 @@ pipeline_steps <- tibble::tribble(
 
   # Phase 3: Master Cohort Integration & Clinical Benchmarking
   file.path("R", "integrate_data.R"),       "Integrate multiomics data layers",
-  file.path("R", "quick_survival_check.R"), "Baseline cohort survival check",
+  file.path("R", "survival_check.R"),       "Baseline cohort survival check",
 
   # Phase 4: Downstream Multi-Omics Feature Extraction
   file.path("R", "feature_selection.R"),    "Screen RPPA: multivariable LASSO",

@@ -29,31 +29,31 @@
 
 # Validate Inputs ------------------------------------------------
 
-check_required_objects("survival_data")
+check_required_objects(
+  c(
+    "survival_data",
+    "selected_clinical_features",
+    "clinical_candidate_cols"
+  )
+)
 
+# Validate outcome columns only — clinical predictors are dynamic.
 required_survival_cols <- c(
   "patient_id",
   "sample_id",
   "os_months",
-  "os_event",
-  "age",
-  "sex",
-  "stage",
-  "grade"
+  "os_event"
 )
 
 check_has_columns(
   "survival_data",
-  required_survival_cols
+  c(required_survival_cols, selected_clinical_features)
 )
-
 
 # Column Classification --------------------------------------------------------
 # Separate the individual feature blocks cleanly by parsing column name prefixes
 
 all_col_names <- names(survival_data)
-
-clinical_cols <- required_survival_cols
 
 mutation_feature_cols <- all_col_names[
   stringr::str_starts(all_col_names, "mut_")
@@ -63,10 +63,19 @@ rna_feature_cols <- all_col_names[
   stringr::str_starts(all_col_names, "rna_")
 ]
 
-rppa_feature_cols <- setdiff(
-  all_col_names,
-  c(clinical_cols, mutation_feature_cols, rna_feature_cols)
+# Exclude outcome/ID columns AND all clinical candidate columns from the RPPA
+# candidate set. clinical_candidate_cols (the full list from prepare_clinical.R)
+# is used here rather than selected_clinical_features so that numeric clinical
+# variables such as aneuploidy_score and tmb_nonsynonymous are not mistakenly
+# screened as RPPA proteins.
+non_rppa_cols <- c(
+  required_survival_cols,
+  clinical_candidate_cols,
+  mutation_feature_cols,
+  rna_feature_cols
 )
+
+rppa_feature_cols <- setdiff(all_col_names, non_rppa_cols)
 
 
 # Filter RPPA Candidates -------------------------------------------------------
@@ -166,7 +175,9 @@ top_uni_proteins <- rppa_univariable_results |>
   dplyr::slice_head(n = 30L) |>
   dplyr::pull(feature)
 
-clinical_vars <- c("age", "sex", "stage", "grade")
+# Use the empirically selected clinical features rather than a hardcoded list.
+clinical_vars <- selected_clinical_features
+
 modelling_vars <- c(clinical_vars, top_uni_proteins)
 
 lasso_data <- survival_data |>

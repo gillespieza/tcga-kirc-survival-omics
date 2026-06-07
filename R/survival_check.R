@@ -34,22 +34,25 @@
 
 # Validate Inputs -------------------------------------------------------------
 
-check_required_objects("clinical_rppa_rna_mutation")
+check_required_objects(
+  c(
+    "clinical_rppa_rna_mutation",
+    "selected_clinical_features"
+  )
+)
 
+# Validate outcome columns only — clinical predictor columns are dynamic
+# and defined by selected_clinical_features from screen_clinical.R.
 required_survival_cols <- c(
   "sample_id",
   "patient_id",
   "os_months",
-  "os_event",
-  "age",
-  "sex",
-  "stage",
-  "grade"
+  "os_event"
 )
 
 check_has_columns(
   "clinical_rppa_rna_mutation",
-  required_survival_cols
+  c(required_survival_cols, selected_clinical_features)
 )
 
 
@@ -117,7 +120,9 @@ print(overall_survival_summary)
 # Use complete cases for the clinical covariates so coxph uses a transparent
 # and reproducible analysis set.
 
-clinical_vars <- c("os_months", "os_event", "age", "sex", "stage", "grade")
+# selected_clinical_features is defined by screen_clinical.R and replaces
+# the previous hardcoded list of age, sex, stage, and grade.
+clinical_vars <- c("os_months", "os_event", selected_clinical_features)
 
 clinical_model_data <- enforce_complete_cases(
   data      = survival_data,
@@ -131,8 +136,13 @@ if (nrow(clinical_model_data) < 20L) {
   )
 }
 
+# reformulate() builds the formula from the selected feature names,
+# avoiding fragile paste()/as.formula() string construction.
 clinical_cox_fit <- survival::coxph(
-  survival::Surv(os_months, os_event) ~ age + sex + stage + grade,
+  reformulate(
+    termlabels = selected_clinical_features,
+    response   = "survival::Surv(os_months, os_event)"
+  ),
   data = clinical_model_data,
   ties = "efron"
 )
