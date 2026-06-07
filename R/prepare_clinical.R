@@ -35,6 +35,14 @@
 #   - Collection process artefacts (selection bias, not biology):
 #       TISSUE_PROSPECTIVE_COLLECTION_INDICATOR,
 #       TISSUE_RETROSPECTIVE_COLLECTION_INDICATOR
+#   - Procedural variables (no direct biological mechanism on survival):
+#       PRIMARY_LYMPH_NODE_PRESENTATION_ASSESSMENT — binary flag recording
+#         whether lymph nodes were examined at surgery; univariable association
+#         with survival is confounded entirely by stage and disappears in
+#         multivariable models
+#       PRIOR_DX — records a prior cancer diagnosis; lacks a plausible direct
+#         biological effect on post-diagnosis ccRCC survival and is more likely
+#         a proxy for healthcare access or surveillance intensity.
 #
 # NOTE on TNM vs composite stage: PATH_T_STAGE, PATH_N_STAGE, PATH_M_STAGE,
 # and AJCC_PATHOLOGIC_TUMOR_STAGE are all retained as candidates. They are
@@ -141,8 +149,6 @@ candidate_col_map <- tibble::tibble(
     "AGE",
     "SEX",
     "WEIGHT",                                     # body weight; obesity linked to RCC outcomes
-    "PRIOR_DX",                                   # prior cancer diagnosis
-    "PRIMARY_LYMPH_NODE_PRESENTATION_ASSESSMENT", # lymph node assessment at presentation
 
     # --- Pathological staging ---
     "AJCC_PATHOLOGIC_TUMOR_STAGE",                # composite AJCC stage (screened alongside TNM)
@@ -164,8 +170,6 @@ candidate_col_map <- tibble::tibble(
     "age",
     "sex",
     "weight",
-    "prior_dx",
-    "lymph_node_assessment",
     "stage",
     "path_t_stage",
     "path_n_stage",
@@ -181,8 +185,6 @@ candidate_col_map <- tibble::tibble(
     "numeric",        # age
     "factor",         # sex
     "numeric",        # weight
-    "factor",         # prior_dx
-    "factor",         # lymph_node_assessment
     "factor_special", # stage — explicit levels applied below
     "factor",         # path_t_stage
     "factor",         # path_n_stage
@@ -381,4 +383,4 @@ clinical_survival_summary <- clinical_survival |>
   )
 
 message("Clinical survival table prepared.")
-print(clinical_survival_summary)
+# print(clinical_survival_summary)
