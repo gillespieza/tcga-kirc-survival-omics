@@ -83,7 +83,11 @@ model_specs <- list(
   RPPA = c(clinical_vars, rppa_vars),
   RNA_Path = c(clinical_vars, rna_vars),
   RNA_DataDriven = c(clinical_vars, rna_datadriven_vars),
-  Integrated = c(clinical_vars, cna_vars, rppa_vars, rna_vars)
+
+  # CNA excluded from the integrated model due to near-complete separation
+  # caused by very low feature prevalence (2.6-2.8%) in the full cohort.
+  # CNA is retained as a standalone comparison model in the CV results.
+  Integrated = c(clinical_vars, rppa_vars, rna_vars)
 )
 
 
