@@ -150,20 +150,22 @@ readr::write_csv(
 
 
 # 2. Multivariable LASSO Feature Selection -------------------------------------
-# Restrict the model space to the top 30 univariable proteins to avoid a
-# sample size crash
+# Proteins are screened independently of clinical covariates to give them a
+# fair chance to show prognostic signal among themselves. Clinical variables
+# are intentionally excluded from the LASSO design matrix — they are added
+# back at the modelling stage in survival_models.R. This prevents stage and
+# grade from dominating regularisation and shrinking all protein coefficients
+# to zero (clinical dominance).
+#
+# The LASSO is restricted to the top 30 univariable proteins to avoid a
+# sample size crash.
 
 top_uni_proteins <- rppa_univariable_results |>
   dplyr::slice_head(n = 30L) |>
   dplyr::pull(feature)
 
-# Use the empirically selected clinical features rather than a hardcoded list.
-clinical_vars <- selected_clinical_features
-
-modelling_vars <- c(clinical_vars, top_uni_proteins)
-
 lasso_data <- survival_data |>
-  dplyr::select(dplyr::all_of(c("os_months", "os_event", modelling_vars))) |>
+  dplyr::select(dplyr::all_of(c("os_months", "os_event", top_uni_proteins))) |>
   tidyr::drop_na()
 
 message(
@@ -171,57 +173,44 @@ message(
   nrow(lasso_data)
 )
 
-# Construct design matrix including dummy expansion strings for factor variables
-x_matrix <- stats::model.matrix(
-  stats::as.formula(paste("~", paste(modelling_vars, collapse = " + "))),
-  data = lasso_data
-)[, -1L]
-
-x_names <- colnames(x_matrix)
-
-# Map clinical vs proteomic column position indices
-clinical_indices <- which(!x_names %in% top_uni_proteins)
+# Design matrix contains proteins only — no dummy expansion needed for
+# clinical factors since they are excluded
+x_matrix <- as.matrix(lasso_data[top_uni_proteins])
 
 y_surv <- survival::Surv(
   time  = lasso_data$os_months,
   event = lasso_data$os_event
 )
 
-# Set penalty factors: 0.001 acts as a ridge stabiliser for clinical baseline
-# indicators
-penalty_vector <- rep(1L, ncol(x_matrix))
-penalty_vector[clinical_indices] <- 0.001
-
 message("Fitting cross-validated multivariable LASSO Cox model ...")
 
+# Uniform penalty across all proteins — no ridge stabilisation needed since
+# clinical variables are absent and separation is unlikely among continuous
+# protein z-scores
 lasso_cv_fit <- glmnet::cv.glmnet(
-  x              = x_matrix,
-  y              = y_surv,
-  family         = "cox",
-  penalty.factor = penalty_vector,
-  nfolds         = 10L,
-  cox.ties       = "efron"
+  x        = x_matrix,
+  y        = y_surv,
+  family   = "cox",
+  nfolds   = 10L,
+  cox.ties = "efron"
 )
 
 
 # 3. Tiered Feature Extraction & Fail-Safes ------------------------------------
 
-# Tier A: Attempt parsimonious extraction via standard lambda.1se
+# Tier A: Parsimonious extraction via lambda.1se
 lasso_coefs <- stats::coef(lasso_cv_fit, s = "lambda.1se") |> as.matrix()
 
 lasso_results_df <- tibble::tibble(
   feature     = rownames(lasso_coefs),
   coefficient = as.numeric(lasso_coefs)
 ) |>
-  dplyr::filter(
-    .data$coefficient != 0L,
-    !.data$feature %in% x_names[clinical_indices]
-  ) |>
+  dplyr::filter(.data$coefficient != 0L) |>
   dplyr::arrange(dplyr::desc(abs(.data$coefficient)))
 
 selected_rppa_features <- lasso_results_df |> dplyr::pull(feature)
 
-# Tier B Fallback: Revert to lambda.min if 1se is completely shrunk
+# Tier B Fallback: Revert to lambda.min if lambda.1se shrinks everything
 if (length(selected_rppa_features) == 0L) {
   message(
     "LASSO shrunk all protein coefficients to zero at lambda.1se. ",
@@ -234,22 +223,19 @@ if (length(selected_rppa_features) == 0L) {
     feature     = rownames(lasso_coefs_min),
     coefficient = as.numeric(lasso_coefs_min)
   ) |>
-    dplyr::filter(
-      .data$coefficient != 0L,
-      !.data$feature %in% x_names[clinical_indices]
-    ) |>
+    dplyr::filter(.data$coefficient != 0L) |>
     dplyr::arrange(dplyr::desc(abs(.data$coefficient)))
 
   selected_rppa_features <- lasso_results_df |> dplyr::pull(feature)
 }
 
-# Tier C Fallback: Revert to top 5 univariable features if clinical dominance
-# is absolute
+# Tier C Fallback: Top 5 univariable features if both lambdas shrink everything.
+# Unlike the previous design, this is now a genuine edge case rather than the
+# expected outcome, since clinical dominance has been eliminated from the LASSO.
 if (length(selected_rppa_features) == 0L) {
   warning(
-    "\u26a0\ufe0f LASSO shrunk all protein coefficients to zero at lambda.min ",
-    "due to clinical dominance. Falling back to the top 5 most robust ",
-    "univariable prognostic markers to guarantee pipeline continuity.",
+    "\u26a0\ufe0f LASSO shrunk all protein coefficients to zero at lambda.min. ",
+    "Falling back to the top 5 most robust univariable prognostic markers.",
     call. = FALSE
   )
 
@@ -263,7 +249,7 @@ if (length(selected_rppa_features) == 0L) {
   selected_rppa_features <- lasso_results_df |> dplyr::pull(feature)
 }
 
-# Apply an upper cap to eliminate selection bias and structural EPV deficits
+# Cap at 10 proteins to protect events-per-variable ratio in downstream models
 if (length(selected_rppa_features) > 10L) {
   message(
     "Selection isolated more than 10 proteins. Capping at top 10 ",
