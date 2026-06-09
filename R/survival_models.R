@@ -7,7 +7,7 @@
 #   3. Clinical + CNA
 #   4. Clinical + RPPA Proteomics (Top 5 LASSO-retained markers)
 #   5. Clinical + RNA Pathways (All 8 independent MSigDB signatures)
-#   6. Clinical + RNA Data-Driven Score (Top 20 univariable p-value genes)
+#   6. Clinical + RNA Data-Driven Score (Top 10 univariable p-value genes)
 #   7. Unified Multi-Omics Integrated Model (Clinical + Mutations + CNA +
 #      RPPA + RNA Pathways)
 #
@@ -59,19 +59,16 @@ rna_vars <- names(survival_data)[stringr::str_starts(
   !stringr::str_ends(names(survival_data), "_mean") &
   names(survival_data) != "score_rna_datadriven"]
 
-# Isolate the standalone data-driven PC1 score
-rna_datadriven_vars <- "score_rna_datadriven"
+# Isolate the top 10 data-driven genes as individual features.
+# top_datadriven_genes is defined by pathway_scores.R.
+rna_datadriven_vars <- top_datadriven_genes
 
 message("=== Modelling Feature Dimensions ===")
 message("Clinical Covariates    : ", length(clinical_vars))
 message("Copy Number Alterations: ", length(cna_vars))
 message("RPPA Proteins          : ", length(rppa_vars))
 message("RNA Curated Pathways   : ", length(rna_vars), " (8 signatures)")
-message(
-  "RNA Data-Driven Score  : ",
-  length(rna_datadriven_vars),
-  " (1 axis)"
-)
+message("RNA Data-Driven Genes  : ", length(rna_datadriven_vars), " (top 10)")
 message("====================================")
 
 
@@ -87,7 +84,7 @@ model_specs <- list(
   # CNA excluded from the integrated model due to near-complete separation
   # caused by very low feature prevalence (2.6-2.8%) in the full cohort.
   # CNA is retained as a standalone comparison model in the CV results.
-  Integrated = c(clinical_vars, rppa_vars, rna_vars)
+  Integrated = c(clinical_vars, rppa_vars, rna_vars, rna_datadriven_vars)
 )
 
 

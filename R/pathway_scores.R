@@ -4,7 +4,7 @@
 #                     signatures.
 # Engine 2 (Data-Driven): Conducts an unbiased univariable Cox screening
 #                         loop across ALL available RNA-seq genes, isolates
-#                         the top 20 by p-value, and computes a summary
+#                         the top 10 by p-value, and computes a summary
 #                         PC1 score.
 #
 # Requires:
@@ -134,39 +134,44 @@ parallel::clusterExport(
 )
 
 # Run high-performance univariable processing concurrently across workers
-results_list <- parallel::parLapply(cl, all_rna_cols, function(g_col) {
-  single_gene_df <- data.frame(
-    os_months  = full_screening_df$os_months,
-    os_event   = full_screening_df$os_event,
-    expression = full_screening_df[[g_col]]
-  )
+# pblapply provides a console progress bar compatible with socket clusters
+results_list <- pbapply::pblapply(
+  all_rna_cols,
+  function(g_col) {
+    single_gene_df <- data.frame(
+      os_months  = full_screening_df$os_months,
+      os_event   = full_screening_df$os_event,
+      expression = full_screening_df[[g_col]]
+    )
 
-  if (sum(!is.na(single_gene_df$expression)) < 10L) {
-    return(NULL)
-  }
-
-  fit_gene <- tryCatch(
-    suppressWarnings(
-      survival::coxph(
-        survival::Surv(os_months, os_event) ~ expression,
-        data = single_gene_df,
-        ties = "efron"
-      )
-    ),
-    error = function(e) NULL
-  )
-
-  if (!is.null(fit_gene)) {
-    coef_summary <- broom::tidy(fit_gene)
-    if (nrow(coef_summary) > 0L) {
-      return(data.frame(
-        gene_feature     = g_col,
-        p_value          = coef_summary$p.value[1L],
-        stringsAsFactors = FALSE
-      ))
+    if (sum(!is.na(single_gene_df$expression)) < 10L) {
+      return(NULL)
     }
-  }
-})
+
+    fit_gene <- tryCatch(
+      suppressWarnings(
+        survival::coxph(
+          survival::Surv(os_months, os_event) ~ expression,
+          data = single_gene_df,
+          ties = "efron"
+        )
+      ),
+      error = function(e) NULL
+    )
+
+    if (!is.null(fit_gene)) {
+      coef_summary <- broom::tidy(fit_gene)
+      if (nrow(coef_summary) > 0L) {
+        return(data.frame(
+          gene_feature     = g_col,
+          p_value          = coef_summary$p.value[1L],
+          stringsAsFactors = FALSE
+        ))
+      }
+    }
+  },
+  cl = cl    # pass the socket cluster for parallel execution
+)
 
 parallel::stopCluster(cl)
 
@@ -174,22 +179,39 @@ parallel::stopCluster(cl)
 rna_screening_df <- dplyr::bind_rows(results_list) |>
   dplyr::arrange(.data$p_value)
 
-# Isolate the top 20 most statistically significant prognostic genes
-top_20_datadriven_genes <- rna_screening_df |>
-  dplyr::slice_head(n = 20L) |>
+top_datadriven_genes <- rna_screening_df |>
+  dplyr::slice_head(n = 10L) |>
   dplyr::pull(gene_feature)
 
+# Append the top 10 data-driven gene expression columns to survival_data
+# so they are available as individual features in survival_models.R.
+# These genes come from the full transcriptome screen and may not be in
+# the pathway-filtered rnaseq_expression matrix.
+top_genes_df <- full_rna_df |>
+  dplyr::select(sample_id, dplyr::all_of(top_datadriven_genes))
+
+survival_data <- survival_data |>
+  dplyr::select(
+    -dplyr::any_of(top_datadriven_genes)
+  ) |>
+  dplyr::left_join(top_genes_df, by = "sample_id")
+
 message(
-  "Isolated the top 20 most significant data-driven genes. Top 3: ",
+  "Appended ", length(top_datadriven_genes),
+  " data-driven gene columns to survival_data."
+)
+
+message(
+  "Isolated the top 10 most significant data-driven genes. Top 3: ",
   paste(
-    head(stringr::str_remove(top_20_datadriven_genes, "^rna_"), 3L),
+    head(stringr::str_remove(top_datadriven_genes, "^rna_"), 3L),
     collapse = ", "
   )
 )
 
 # Top genes may not be in the pathway-filtered matrix — use the full matrix
 mat_datadriven <- full_rna_df |>
-  dplyr::select(dplyr::all_of(top_20_datadriven_genes)) |>
+  dplyr::select(dplyr::all_of(top_datadriven_genes)) |>
   as.matrix()
 
 score_list[["score_rna_datadriven"]] <- compute_pc1_score(mat_datadriven)

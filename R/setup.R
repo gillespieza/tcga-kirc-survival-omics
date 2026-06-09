@@ -76,6 +76,7 @@ cran_packages <- c(
   "glmnet", # Penalised regression, including LASSO Cox models
   "broom", # Tidy model summaries for Cox model results
   "progress", # Progress bars for long-running steps
+  "pbapply", # progress bar for parallel lapply
   "msigdbr" # MSigDB gene sets for pathway analysis
 )
 

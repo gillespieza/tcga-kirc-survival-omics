@@ -132,33 +132,55 @@ enforce_complete_cases <- function(data, variables) {
 
 # Standardised Graphics Export -------------------------------------------------
 
-# Formats and saves high-resolution graphics files to disk defensively
 save_pipeline_plot <- function(plot_object,
                                file_path,
                                width,
                                height,
                                resolution = 72) {
-  grDevices::png(
-    filename = file_path,
-    width    = width,
-    height   = height,
-    res      = resolution
-  )
+  # Convert dimensions from pixels to inches for ggsave
+  width_in  <- width  / resolution
+  height_in <- height / resolution
 
-  # Print the full ggsurvplot object so survminer's own print method
-  # combines the KM curve and risk table via gridExtra before writing to disk.
-  # Previously this branch called print(plot_object$plot), which silently
-  # dropped the risk table.
   if (inherits(plot_object, "ggsurvplot")) {
-    print(plot_object) # was: print(plot_object$plot)
+    # ggsurvplot combines plot + risk table via grid internally; saving via
+    # ggsave with the survminer method avoids viewport state conflicts
+    ggplot2::ggsave(
+      filename = file_path,
+      plot     = print(plot_object),
+      width    = width_in,
+      height   = height_in,
+      dpi      = resolution,
+      device   = "png"
+    )
   } else {
-    print(plot_object)
+    ggplot2::ggsave(
+      filename = file_path,
+      plot     = plot_object,
+      width    = width_in,
+      height   = height_in,
+      dpi      = resolution,
+      device   = "png"
+    )
   }
 
-  grDevices::dev.off()
-
-  # Second print sends the combined figure to the interactive viewer as well.
-  print(plot_object)
+  # Send to the active RStudio plot pane after saving to disk.
+  # Wrapped in tryCatch so viewport errors on screen rendering never
+  # crash the pipeline — the file is already safely written above.
+  tryCatch(
+    {
+      if (inherits(plot_object, "ggsurvplot")) {
+        print(plot_object)
+      } else {
+        print(plot_object)
+      }
+    },
+    error = function(e) {
+      message(
+        "Note: plot saved to disk but could not be rendered to screen: ",
+        conditionMessage(e)
+      )
+    }
+  )
 }
 
 # Standardise TCGA sample barcodes to a uniform 15-character hyphenated format
