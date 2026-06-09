@@ -21,9 +21,13 @@
 
 
 # Validate inputs --------------------------------------------------------------
-
 check_required_objects(
-  c("rnaseq_expression", "rnaseq_gene_set_membership", "survival_data")
+  c(
+    "rnaseq_expression",
+    "rnaseq_expression_full",
+    "rnaseq_gene_set_membership",
+    "survival_data"
+  )
 )
 
 
@@ -99,7 +103,15 @@ outcome_df <- survival_data |>
 screening_df <- rna_df |>
   dplyr::inner_join(outcome_df, by = "sample_id")
 
-all_rna_cols <- names(rna_df)[names(rna_df) != "sample_id"]
+# Engine 2 screens the full post-QC transcriptome, not just pathway members
+full_rna_df <- rnaseq_expression_full
+
+# Align the full matrix with the survival outcome data
+full_screening_df <- full_rna_df |>
+  dplyr::inner_join(outcome_df, by = "sample_id")
+
+all_rna_cols <- names(full_rna_df)[names(full_rna_df) != "sample_id"]
+
 n_genes <- length(all_rna_cols)
 
 num_cores <- max(1L, parallel::detectCores() - 1L)
@@ -114,18 +126,19 @@ parallel::clusterEvalQ(cl, {
   library(survival)
   library(broom)
 })
+
 parallel::clusterExport(
   cl,
-  varlist = c("all_rna_cols", "screening_df"),
+  varlist = c("all_rna_cols", "full_screening_df"),
   envir   = environment()
 )
 
 # Run high-performance univariable processing concurrently across workers
 results_list <- parallel::parLapply(cl, all_rna_cols, function(g_col) {
   single_gene_df <- data.frame(
-    os_months  = screening_df$os_months,
-    os_event   = screening_df$os_event,
-    expression = screening_df[[g_col]]
+    os_months  = full_screening_df$os_months,
+    os_event   = full_screening_df$os_event,
+    expression = full_screening_df[[g_col]]
   )
 
   if (sum(!is.na(single_gene_df$expression)) < 10L) {
@@ -174,8 +187,8 @@ message(
   )
 )
 
-# Extract the continuous sub-matrix for PCA reduction via tidy select
-mat_datadriven <- rna_df |>
+# Top genes may not be in the pathway-filtered matrix — use the full matrix
+mat_datadriven <- full_rna_df |>
   dplyr::select(dplyr::all_of(top_20_datadriven_genes)) |>
   as.matrix()
 

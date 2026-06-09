@@ -146,7 +146,73 @@ message(
 )
 
 
-# Filter and Deduplicate -------------------------------------------------------
+# Full-Transcriptome Long Format and QC ---------------------------------------
+# Pivots the complete raw expression matrix (all 20,531 genes) to long format,
+# standardises sample IDs, log2-transforms, and applies the same QC filters
+# used for the pathway-filtered matrix. Used exclusively by Engine 2.
+
+rnaseq_long_full <- rnaseq_data |>
+  # Deduplicate on the full gene set by mean expression before pivoting
+  dplyr::mutate(
+    row_mean = rowMeans(
+      as.matrix(dplyr::pick(-Hugo_Symbol)),
+      na.rm = TRUE
+    )
+  ) |>
+  dplyr::arrange(dplyr::desc(.data$row_mean)) |>
+  dplyr::distinct(.data$Hugo_Symbol, .keep_all = TRUE) |>
+  dplyr::select(-row_mean) |>
+  tidyr::pivot_longer(
+    cols      = -Hugo_Symbol,
+    names_to  = "sample_id",
+    values_to = "rsem"
+  ) |>
+  dplyr::mutate(
+    sample_id = standardise_sample_id(.data$sample_id),
+    rsem      = tidyr::replace_na(.data$rsem, 0),
+    log2_expr = log2(.data$rsem + 1)
+  )
+
+# Quality Control on the full transcriptome -----------------------------------
+# Same variance and missingness thresholds as the pathway-filtered matrix.
+
+gene_qc_full <- rnaseq_long_full |>
+  dplyr::group_by(.data$Hugo_Symbol) |>
+  dplyr::summarise(
+    pct_na      = mean(is.na(.data$log2_expr)),
+    variance    = stats::var(.data$log2_expr, na.rm = TRUE),
+    .groups     = "drop"
+  ) |>
+  dplyr::mutate(
+    low_variance = is.na(.data$variance) | .data$variance < 1e-6
+  )
+
+excluded_genes_full <- gene_qc_full |>
+  dplyr::filter(.data$pct_na > 0.20 | .data$low_variance) |>
+  dplyr::pull(Hugo_Symbol)
+
+message("Excluded genes (QC, full transcriptome): ", length(excluded_genes_full))
+
+# Full-Transcriptome Wide Matrix (Engine 2 input) -----------------------------
+
+rnaseq_expression_full <- rnaseq_long_full |>
+  dplyr::filter(!.data$Hugo_Symbol %in% excluded_genes_full) |>
+  dplyr::select(sample_id, Hugo_Symbol, log2_expr) |>
+  tidyr::pivot_wider(
+    names_from  = "Hugo_Symbol",
+    values_from = "log2_expr"
+  ) |>
+  dplyr::rename_with(~ paste0("rna_", .x), -sample_id)
+
+message(
+  "Full-transcriptome matrix for Engine 2: ",
+  nrow(rnaseq_expression_full), " samples x ",
+  ncol(rnaseq_expression_full) - 1L, " genes"
+)
+
+
+# Filter and Deduplicate (pathway members only) --------------------------------
+# From here, processing continues on the pathway-filtered gene universe only.
 
 rnaseq_filtered <- rnaseq_data |>
   dplyr::filter(.data$Hugo_Symbol %in% genes_in_data) |>
@@ -164,9 +230,6 @@ message("Genes after deduplication: ", nrow(rnaseq_filtered))
 
 
 # Long Format and Transform ----------------------------------------------------
-# Reshapes the wide expression matrix into a long format, standardises the
-# raw sample barcodes to 15-character hyphenated keys, and applies log2
-# transformation with a 1-count pseudocount.
 
 rnaseq_long <- rnaseq_filtered |>
   tidyr::pivot_longer(
@@ -175,12 +238,30 @@ rnaseq_long <- rnaseq_filtered |>
     values_to = "rsem"
   ) |>
   dplyr::mutate(
-    # Clean and normalise sample identifiers to match the master key format
     sample_id = standardise_sample_id(.data$sample_id),
     rsem      = tidyr::replace_na(.data$rsem, 0),
     log2_expr = log2(.data$rsem + 1)
   )
 
+
+# Quality Control (pathway members) -------------------------------------------
+
+gene_qc <- rnaseq_long |>
+  dplyr::group_by(.data$Hugo_Symbol) |>
+  dplyr::summarise(
+    pct_na      = mean(is.na(.data$log2_expr)),
+    variance    = stats::var(.data$log2_expr, na.rm = TRUE),
+    .groups     = "drop"
+  ) |>
+  dplyr::mutate(
+    low_variance = is.na(.data$variance) | .data$variance < 1e-6
+  )
+
+excluded_genes <- gene_qc |>
+  dplyr::filter(.data$pct_na > 0.20 | .data$low_variance) |>
+  dplyr::pull(Hugo_Symbol)
+
+message("Excluded genes (QC): ", length(excluded_genes))
 
 # Quality Control --------------------------------------------------------------
 
